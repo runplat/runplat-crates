@@ -9,13 +9,6 @@ pub struct ReprTable<R: Repr> {
     map: ReprMap<R>
 }
 
-impl<R: Repr> ReprTable<R> {
-    /// Returns a view of a piece of representation
-    pub fn view(&self, key: Key) -> Option<View<R>> {
-        None
-    }
-}
-
 /// Representation is associated data that can be used to represent a resource in various contexts
 /// 
 /// For example, a resource's type information is it's representation within a rust application.
@@ -57,7 +50,7 @@ struct ReprMap<R: Repr> {
     inner: BTreeMap<u64, Kind<R>>
 }
 
-type ThreadSafeConcurrentOrderedRepresentationMap<R> = std::sync::Arc<std::sync::RwLock<BTreeMap<u64, Arc<R>>>>;
+type OrderedReprMap<R> = BTreeMap<u64, Arc<R>>;
 
 /// Enumeration of kinds of representations
 pub enum Kind<R: Repr> {
@@ -72,7 +65,7 @@ pub enum Kind<R: Repr> {
         /// Head value which can be used to derive identifier keys for mapped representations
         head: Head<R>,
         /// Thread-safe conccurrent ordered map of identified representations
-        map: ThreadSafeConcurrentOrderedRepresentationMap<R>
+        map: OrderedReprMap<R>
     }
 }
 
