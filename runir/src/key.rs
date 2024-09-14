@@ -8,8 +8,6 @@ pub struct Key {
     pub data: u128
 }
 
-struct KeyTable {}
-
 impl Key {
     /// Stores an attribute with this key
     pub fn with(&mut self, attr: impl Into<Attribute>) -> &mut Self {

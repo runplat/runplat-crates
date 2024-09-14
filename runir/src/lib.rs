@@ -14,6 +14,7 @@ mod key;
 mod repr;
 mod resource;
 
+pub use repr::*;
 pub use key::Key;
 pub use resource::Resource;
 
@@ -47,3 +48,12 @@ pub trait Storage {
     /// Returns None if no resource could be found with the provided key
     fn take<T: Resource>(&mut self, key: Key) -> Option<Self::Cell<T>>;
 }
+
+impl Resource for String {}
+impl Resource for bool {}
+impl Resource for u128 {}
+impl Resource for u64 {}
+impl Resource for u32 {}
+impl Resource for usize {}
+impl Resource for f64 {}
+impl Resource for f32 {}
