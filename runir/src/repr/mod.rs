@@ -1,202 +1,153 @@
 mod config;
-mod find;
+mod checkout;
+mod journal;
 mod map;
+mod repo;
 mod ty;
 
-use config::Config;
-use find::Find;
-use map::Map;
-use ty::TyRepr;
+pub use map::Map;
+pub use config::Config;
+pub use checkout::Checkout;
+pub use journal::Journal;
+pub use ty::TyRepr;
+pub use repo::Repo;
 
 use crate::Resource;
-use std::{
-    collections::BTreeMap,
-    sync::{Arc, OnceLock, RwLock},
-};
+use std::{any::TypeId, collections::BTreeMap, fmt::Debug, pin::Pin, sync::Arc};
 
-/// Type-alias for a shared head repr
-pub type SharedHead = Arc<dyn Repr>;
+/// Type-alias for a dynamic head repr
+type DynHead = Pin<Arc<dyn Repr>>;
 
 /// Type-alias for the internal data structure used by the `Tree` type
-type OrderedReprMap<R> = BTreeMap<u64, Arc<R>>;
-
-/// Type-alias for a thread-safe, cloneable, shared key store
-type SharedKeys = Arc<std::sync::RwLock<Tree<TyRepr>>>;
-
-/// Type-alias for the container storing shared keys
-type SharedKeysContainer = std::sync::OnceLock<SharedKeys>;
+type OrderedReprMap<R> = BTreeMap<u64, Head<R>>;
 
 /// Enumeration of identifier variants
 pub enum Identifier<'a> {
     Str(&'a str),
-    Id(u64),
+    Id(usize),
 }
 
 /// Representation is associated data that can be used to represent a resource in various contexts
 ///
 /// For example, a resource's type information is it's representation within a rust application.
-pub trait Repr: Send + Sync + 'static {
-    /// Returns a "link" value of a representation instance given an identifier
-    ///
-    /// **Note**: Since this is a hash function, it must return the same value for the same identifier
-    fn link_hash_str(self: Arc<Self>, identifier: &str) -> u64;
+pub trait Repr: Resource {
+    /// Returns a cast id for confirming that a DynHandle can cast into this repr
+    fn cast_id(self: Arc<Self>) -> TypeId {
+        self.as_ref().type_id()
+    }
 
-    /// Returns a "link" value of a representation instance given an identifier
-    ///
-    /// **Note**: Since this is a hash function, it must return the same value for the same identifier
-    fn link_hash_u64(self: Arc<Self>, identifier: u64) -> u64;
+    /// Returns the internals implementation
+    fn internals(&self) -> impl ReprInternals
+    where
+        Self: Sized,
+    {
+        TyRepr::new::<Self>()
+    }
 }
 
 /// Representation internals required for managing repr maps and tables
 pub trait ReprInternals: Sized + Repr {
+    /// Returns a "link" value of a representation instance given an identifier
+    ///
+    /// **Note**: Since this is a hash function, it must return the same value for the same identifier
+    fn link_hash_str(&self, identifier: &str) -> u64;
+
+    /// Returns a "link" value of a representation instance given an identifier
+    ///
+    /// **Note**: Since this is a hash function, it must return the same value for the same identifier
+    fn link_hash_id(&self, identifier: usize) -> u64;
+
     /// Returns the head value for this representation
     fn head(&self) -> Head<Self>;
 
-    /// Returns the "handle" value of a representation instance
-    fn handle_of(repr: Kind<Self>) -> ReprHandle;
+    /// Returns a repr_handle for the current repr
+    fn handle(&self) -> ReprHandle;
 }
 
-/// Struct for a global table storing handles that point to representation data
-pub struct ReprTable<R: Repr> {
-    /// Tree storing representations for this table
-    tree: Tree<R>,
-    /// Shared key lookup
-    keys: SharedKeysContainer,
-}
-
-impl<R: Repr> ReprTable<R> {
-    /// Creates a new repr table
-    ///
-    /// A Repr table stores representations and consists of the main tree which maps to each representation,
-    /// and a shared "Keys" reference which is used to generate normalize lookup keys
-    #[inline]
-    pub const fn new() -> Self {
-        Self {
-            tree: Tree {
-                inner: BTreeMap::new(),
-            },
-            keys: OnceLock::new(),
-        }
-    }
-
-    /// Creates a new relative table storing a different representation but sharing the same key-base
-    #[inline]
-    pub fn create_relative<O: Repr>(&self) -> ReprTable<O> {
-        let table = ReprTable::new();
-        if let Err(_) = table.keys.set(self.shared_keys().clone()) {
-            unreachable!("Should be a new table")
-        }
-        table
-    }
-
-    /// Finds a representation from this table for a resource
-    #[inline]
-    pub fn find<Res: Resource>(&self, resource: &Res) -> Find<'_, R>
-    where
-        R: ReprInternals,
-    {
-        let handle = self.type_handle(resource);
-
-        Find {
-            table: self,
-            handle,
-        }
-    }
-
-    /// Configures a representation from this table for a resource
-    #[inline]
-    pub fn config<Res: Resource>(&mut self, resource: &Res) -> Config<'_, R>
-    where
-        R: ReprInternals,
-    {
-        let handle = self.type_handle(resource);
-
-        Config {
-            table: self,
-            handle,
-        }
-    }
-
-    #[inline]
-    fn type_handle<Res: Resource>(&self, resource: &Res) -> ReprHandle {
-        let ty_repr = TyRepr::from(resource);
-
-        TyRepr::handle_of(Kind::Internable(ty_repr.head()))
-    }
-
-    fn shared_keys(&self) -> &SharedKeys {
-        self.keys.get_or_init(|| {
-            Arc::new(RwLock::new(Tree {
-                inner: BTreeMap::new(),
-            }))
-        })
-    }
-}
+/// Struct containing the head representation value
+pub struct Head<R>(pub Pin<Arc<R>>);
 
 /// Enumeration of kinds of representations
 pub enum Kind<R: Repr> {
     /// Internable representations are typically constant literal values that can be broadly represented,
     /// such as type information derived by the compiler. It is well suited for counting classification, but
     /// not well suited for representations that are unique per resource.
-    Internable(Head<R>),
+    Interned(Head<R>),
     /// Mappable representation where each resource can map to a unique repr value. This kind of representation requires an additional "next" value
     /// in addition to the "handle" value in order to succesfully store. It is well suited for naming resources or attaching other types of
     /// labeling data
-    Mappable {
+    Mapped {
         /// Head value which can be used to derive identifier keys for mapped representations
         head: Head<R>,
-        /// Thread-safe conccurrent ordered map of identified representations
+        /// Thread-safe ordered map of identifiers mapped to Head values
         map: OrderedReprMap<R>,
+        /// Handle checkout journal
+        journal: Journal,
     },
 }
 
-/// Struct containing the head representation value
-pub struct Head<R>(pub Arc<R>);
-
-/// Handle containing key data to a specific representation
+/// Handle containing lookup keys for storing representations
+/// 
+/// Can be used to access the representation directly later.
+/// 
+/// Also, the link value can be used to retrieve this handle from a journal,
+/// if the handle was created from `checkout()`,
+#[derive(Clone)]
 pub struct ReprHandle {
     /// Handle value is the key of the head value
     handle: u64,
     /// Link value is the key of a mapped represntation
     link: u64,
-    /// Pointer to the shared head representation
-    shared: SharedHead,
+    /// Pointer to the dynamic head representation
+    head: DynHead,
 }
 
-/// Contains a tree of representations
-#[derive(Clone)]
-struct Tree<R: Repr> {
-    inner: BTreeMap<u64, Kind<R>>,
+impl<R> Head<R> {
+    /// Creates a new repr head
+    pub fn new(repr: R) -> Self {
+        Head(Arc::pin(repr))
+    }
 }
 
-impl<R: Repr + ReprInternals> Kind<R> {
-    /// Returns the head representation
-    pub fn head(&self) -> &Head<R> {
+impl<R: Repr> Kind<R> {
+    /// Returns the "interned" representation which is the head representation
+    pub fn interned(&self) -> &Head<R> {
         match self {
-            Kind::Internable(head) | Kind::Mappable { head, .. } => head,
+            Kind::Interned(head) | Kind::Mapped { head, .. } => head,
         }
     }
 
     /// Maps a repr to an ident
-    pub fn map<'a>(self, ident: impl Into<Identifier<'a>>, repr: R) -> Kind<R> {
+    pub fn map<'a>(
+        self,
+        handle: ReprHandle,
+        ident: impl Into<Identifier<'a>>,
+        repr: R,
+        journal: Journal,
+    ) -> Kind<R> {
         let ident = ident.into();
-        let handle = R::handle_of(self.clone());
         let next = handle.link_to(ident);
         match self {
-            Kind::Internable(head) => Kind::Mappable {
+            Kind::Interned(head) => Kind::Mapped {
                 head,
                 map: {
                     let mut map = BTreeMap::new();
-                    map.insert(next.link(), repr.into());
+                    map.insert(next.link(), Head::new(repr));
                     map
                 },
+                journal,
             },
-            Kind::Mappable { head, mut map } => Kind::Mappable {
+            Kind::Mapped {
+                head,
+                mut map,
+                journal,
+            } => Kind::Mapped {
                 head,
                 map: {
-                    map.insert(next.link(), repr.into());
+                    map.insert(next.link(), Head::new(repr));
                     map
                 },
+                journal,
             },
         }
     }
@@ -204,34 +155,23 @@ impl<R: Repr + ReprInternals> Kind<R> {
     /// Gets a mapped reprsentation from the current kind of repr
     ///
     /// If the current kind is `Internable` returns None
-    pub fn get<'a>(&self, ident: impl Into<Identifier<'a>>) -> Option<(ReprHandle, &Arc<R>)> {
+    pub fn get<'a>(
+        &self,
+        handle: ReprHandle,
+        ident: impl Into<Identifier<'a>>,
+    ) -> Option<(ReprHandle, &Head<R>)> {
         match self {
-            Kind::Internable(_) => None,
-            Kind::Mappable { map, .. } => {
-                let handle = R::handle_of(self.clone()).link_to(ident.into());
-                map.get(&handle.link()).map(|v| (handle, v))
+            Kind::Interned(_) => None,
+            Kind::Mapped { map, journal, .. } => {
+                let handle = handle.link_to(ident.into());
+                map.get(&handle.link())
+                    .map(|v| (handle.checkout(v.clone(), journal.clone()), v))
             }
         }
     }
 }
 
 impl ReprHandle {
-    /// Returns a new repr handle w/ a `link` value set
-    pub fn link_to(&self, ident: Identifier<'_>) -> ReprHandle {
-        let shared = self.shared.clone();
-
-        let link = match ident {
-            Identifier::Str(ident) => shared.link_hash_str(ident),
-            Identifier::Id(ident) => shared.link_hash_u64(ident),
-        };
-
-        ReprHandle {
-            handle: self.handle,
-            link,
-            shared: self.shared.clone(),
-        }
-    }
-
     /// Returns the "handle" value representing this handle
     #[inline]
     pub fn handle(&self) -> u64 {
@@ -255,38 +195,67 @@ impl ReprHandle {
     pub fn uuid(&self) -> uuid::Uuid {
         uuid::Uuid::from_u64_pair(self.handle, self.link)
     }
-}
 
-impl<R: Repr> Tree<R> {
-    // /// Inserts a "branch" into the map, returns the previous value if a previous entry existed
-    // pub fn branch(&mut self, repr: R) -> Option<Kind<R>>
-    // where
-    //     R: ReprInternals,
-    // {
-    //     let head = repr.head();
-    //     let branch = Kind::Internable(head);
-    //     let handle = R::handle_of(branch.clone());
-    //     self.inner.insert(handle.handle(), branch)
-    // }
-
-    /// Get a representation from a ReprHandle
-    pub fn get(&self, handle: ReprHandle) -> Option<&Kind<R>> {
-        self.inner.get(&handle.handle())
+    /// Casts the shared head to a representation
+    ///
+    /// If the target type is not the same as the current head, None is returned
+    #[inline]
+    pub fn cast<T: Repr>(&self) -> Option<Arc<T>> {
+        let inner = unsafe { Pin::into_inner_unchecked(self.head.clone()) };
+        let ident = inner.clone().cast_id();
+        let addr = Arc::into_raw(inner);
+        let inner = unsafe { Arc::<T>::from_raw(addr.cast::<T>()) };
+        let matches = ident == inner.clone().cast_id();
+        Some(inner).filter(|_| matches)
     }
 
-    /// Get a representation from a ReprHandle
-    pub fn get_mut(&mut self, handle: ReprHandle) -> Option<&mut Kind<R>> {
-        self.inner.get_mut(&handle.handle())
+    /// Returns a new repr handle w/ a `link` value set
+    #[inline]
+    pub(crate) fn link_to<'a>(&self, ident: impl Into<Identifier<'a>>) -> ReprHandle {
+        let link = match ident.into() {
+            Identifier::Str(ident) => self.head.internals().link_hash_str(ident),
+            Identifier::Id(ident) => self.head.internals().link_hash_id(ident),
+        };
+
+        ReprHandle {
+            handle: self.handle,
+            link: {
+                if self.link > 0 && self.link != link {
+                    self.link ^ link
+                } else {
+                    link
+                }
+            },
+            head: self.head.clone(),
+        }
+    }
+
+    /// Returns this handle with a different head pointer and link setting
+    #[inline]
+    pub(crate) fn checkout<R: Repr>(&self, head: Head<R>, journal: Journal) -> ReprHandle {
+        let head = head.0.clone();
+
+        let mut handle = ReprHandle {
+            handle: self.handle,
+            link: 0,
+            head,
+        };
+        handle.link = journal.log(self.link as usize, handle.clone());
+        handle
     }
 }
+
+impl Resource for DynHead {}
+impl Repr for DynHead {}
 
 impl<R: Repr> Clone for Kind<R> {
     fn clone(&self) -> Self {
         match self {
-            Self::Internable(arg0) => Self::Internable(arg0.clone()),
-            Self::Mappable { head, map } => Self::Mappable {
+            Self::Interned(arg0) => Self::Interned(arg0.clone()),
+            Self::Mapped { head, map, journal } => Self::Mapped {
                 head: head.clone(),
                 map: map.clone(),
+                journal: journal.clone(),
             },
         }
     }
@@ -300,7 +269,7 @@ impl<R> Clone for Head<R> {
 
 impl<R: Repr> From<Head<R>> for Kind<R> {
     fn from(value: Head<R>) -> Self {
-        Self::Internable(value)
+        Self::Interned(value)
     }
 }
 
@@ -310,97 +279,33 @@ impl<'a> From<&'a str> for Identifier<'a> {
     }
 }
 
-impl<'a> From<u64> for Identifier<'a> {
-    fn from(value: u64) -> Self {
+impl<'a> From<usize> for Identifier<'a> {
+    fn from(value: usize) -> Self {
         Identifier::Id(value)
     }
 }
 
-impl<R: Repr> Default for ReprTable<R> {
-    fn default() -> Self {
-        Self::new()
+impl Debug for ReprHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ReprHandle")
+            .field("handle", &self.handle)
+            .field("link", &self.link)
+            .finish()
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{ty::TyRepr, Repr, ReprHandle, ReprInternals, ReprTable};
-    use crate::Resource;
-    use std::sync::Arc;
-
-    #[derive(Default)]
-    struct TestRepr;
-
-    impl Resource for TestRepr {}
-
-    impl Repr for TestRepr {
-        fn link_hash_str(self: std::sync::Arc<Self>, identifier: &str) -> u64 {
-            TyRepr::from(self.as_ref())
-                .head()
-                .0
-                .link_hash_str(identifier)
-        }
-
-        fn link_hash_u64(self: std::sync::Arc<Self>, identifier: u64) -> u64 {
-            TyRepr::from(self.as_ref())
-                .head()
-                .0
-                .link_hash_u64(identifier)
-        }
+impl PartialEq for ReprHandle {
+    fn eq(&self, other: &Self) -> bool {
+        self.handle == other.handle && self.link == other.link
     }
+}
 
-    impl ReprInternals for TestRepr {
-        fn head(&self) -> super::Head<Self> {
-            super::Head(Arc::new(TestRepr))
+impl PartialOrd for ReprHandle {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match self.handle.partial_cmp(&other.handle) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
         }
-
-        fn handle_of(repr: super::Kind<Self>) -> super::ReprHandle {
-            match repr {
-                super::Kind::Internable(head) => ReprHandle {
-                    handle: TyRepr::handle_of(super::Kind::Internable(
-                        TyRepr::from(head.0.as_ref()).head(),
-                    ))
-                    .handle(),
-                    link: 0,
-                    shared: head.0.clone(),
-                },
-                super::Kind::Mappable { head, .. } => ReprHandle {
-                    handle: TyRepr::handle_of(super::Kind::Internable(
-                        TyRepr::from(head.0.as_ref()).head(),
-                    ))
-                    .handle(),
-                    link: 0,
-                    shared: head.0.clone(),
-                },
-            }
-        }
-    }
-
-    struct TestResource;
-
-    impl Resource for TestResource {}
-
-    #[test]
-    fn test_repr_table() {
-        let mut table = ReprTable::<TestRepr>::new();
-        table
-            .config(&TestResource)
-            .default_mapped()
-            .map("test", TestRepr);
-        let _ = table
-            .find(&TestResource)
-            .ident("test")
-            .expect("should exist");
-
-        let test_string = String::from("hello world");
-        table
-            .config(&test_string)
-            .default_mapped()
-            .map("test2", TestRepr);
-
-        let _ = table
-            .find(&test_string)
-            .ident("test2")
-            .expect("should exist");
+        self.link.partial_cmp(&other.link)
     }
 }

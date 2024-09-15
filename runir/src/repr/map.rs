@@ -1,18 +1,21 @@
 use super::*;
 
+/// Struct for executing map actions on a repr table
 pub struct Map<'a, R: Repr> {
-    pub(crate) table: &'a mut ReprTable<R>,
-    pub(crate) handle: ReprHandle
+    /// Table being edited
+    pub(crate) repo: &'a mut Repo<R>,
+    /// Handle being mapped with
+    pub(crate) handle: ReprHandle,
 }
 
 impl<'a, R: Repr> Map<'a, R> {
     /// Maps an identifier for the current handle to a representation
-    pub fn map<'c>(self, ident: impl Into<Identifier<'c>>, repr: R)
-    where
-        R: ReprInternals
-    {
-        if let Some(head) = self.table.tree.get_mut(self.handle) {
-            *head = head.clone().map(ident, repr);
+    pub fn map<'c>(&mut self, ident: impl Into<Identifier<'c>>, repr: R) -> &mut Self {
+        let handle = self.handle.clone();
+        let journal = self.repo.journal.clone();
+        if let Some(head) = self.repo.get_mut(&handle) {
+            *head = head.clone().map(handle, ident, repr, journal);
         }
+        self
     }
 }

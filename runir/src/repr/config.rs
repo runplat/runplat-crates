@@ -3,7 +3,7 @@ use super::*;
 /// Struct to configure a table entry
 pub struct Config<'a, R: Repr> {
     /// Mutable reference to a repr table
-    pub(crate) table: &'a mut ReprTable<R>,
+    pub(crate) repo: &'a mut Repo<R>,
     /// Handle
     pub(crate) handle: ReprHandle,
 }
@@ -11,14 +11,9 @@ pub struct Config<'a, R: Repr> {
 impl<'a, R: Repr> Config<'a, R> {
     /// Intern a representation for the current handle
     #[inline]
-    pub fn intern(self, repr: R)
-    where
-        R: ReprInternals,
-    {
-        self.table
-            .tree
-            .inner
-            .insert(self.handle.handle(), Kind::Internable(Head(repr.into())));
+    pub fn intern(self, repr: R) {
+        self.repo
+            .insert(self.handle.handle(), Kind::Interned(Head::new(repr)));
     }
 
     /// Returns a Map config builder for mapping an identifier to a represntation for the current handle
@@ -28,26 +23,24 @@ impl<'a, R: Repr> Config<'a, R> {
     pub fn default_mapped<'new>(self) -> Map<'new, R>
     where
         'a: 'new,
-        R: ReprInternals + Default,
+        R: Default,
     {
-        self.table
-            .tree
-            .inner
-            .entry(self.handle.handle())
-            .or_insert_with(|| Kind::Internable(R::default().head()));
+        self.repo.insert(
+            self.handle.handle(),
+            Kind::Interned(Head::new(R::default())),
+        );
 
         self.mapped()
     }
-    
+
     /// Returns a Map config builder for mapping an identifier to a represntation for the current handle
     #[inline]
     pub fn mapped<'new>(self) -> Map<'new, R>
     where
         'a: 'new,
-        R: ReprInternals,
     {
         Map {
-            table: self.table,
+            repo: self.repo,
             handle: self.handle,
         }
     }

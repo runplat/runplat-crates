@@ -5,17 +5,22 @@
 //!   Key: [Attribute]
 //!   Attribute --> Repr
 //!
-//! Env.storage() -> Storage
+//! let ty = key.attributes().get::<TyRepr>();
+//! let thunk = key.attributes().get::<Thunk>();
+//!
+//! thunk.call(storage.on_event(key));
+//!
 //! Storage.resource
 
 mod attribute;
-mod env;
 mod key;
 mod repr;
 mod resource;
+mod store;
 
-pub use repr::*;
+pub use attribute::Attributes;
 pub use key::Key;
+pub use repr::*;
 pub use resource::Resource;
 
 /// Trait describing runtime storage of resources
@@ -26,15 +31,13 @@ pub trait Storage {
         T: Resource;
 
     /// Container for borrowing a resource from the storage target
-    type BorrowResource<'a, T: Resource>: std::ops::Deref<Target = T> + Send + Sync
+    type BorrowResource<'a, T: Resource>: std::ops::Deref<Target = T>
     where
         Self: 'a;
 
     /// Container for mutably borrowing a resource from the storage target
     type BorrowMutResource<'a, T: Resource>: std::ops::Deref<Target = T>
         + std::ops::DerefMut<Target = T>
-        + Send
-        + Sync
     where
         Self: 'a;
 
@@ -44,7 +47,7 @@ pub trait Storage {
     fn put<'a: 'b, 'b, T: Resource>(&'a mut self, resource: T) -> Option<&'b mut Key>;
 
     /// Take a resource from storage
-    /// 
+    ///
     /// Returns None if no resource could be found with the provided key
     fn take<T: Resource>(&mut self, key: Key) -> Option<Self::Cell<T>>;
 }
