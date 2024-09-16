@@ -5,6 +5,3 @@ edition = "2021"
 
 [dependencies]
 uuid = "1.10.0"
-
-[[test]]
-name = "test_item_observation"

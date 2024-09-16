@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::future::Future;
 use std::marker::PhantomData;
 
@@ -41,14 +42,15 @@ impl Call {
 }
 
 pub struct Bind<P: Plugin> {
-    call: Call,
-    _bound: PhantomData<P>,
+    pub(crate) call: Call,
+    pub(crate) _bound: PhantomData<P>,
 }
 
 impl<P: Plugin> Bind<P> {
     /// Returns a reference to the plugin's resource
     ///
     /// Returns an error if the current call context does not match the target plugin
+    #[inline]
     pub fn plugin<'a: 'b, 'b>(&'a self) -> Result<&'b P> {
         match self.call.item.borrow::<P>() {
             Some(p) => Ok(p),
@@ -59,6 +61,7 @@ impl<P: Plugin> Bind<P> {
     /// Returns a mutable reference to the plugin's resource
     ///
     /// Returns an error if the current call context does not match the target plugin
+    #[inline]
     pub fn plugin_mut(&mut self) -> Result<&mut P> {
         match self.call.item.borrow_mut::<P>() {
             Some(p) => Ok(p),
@@ -69,6 +72,7 @@ impl<P: Plugin> Bind<P> {
     /// Consumes the call context and spawns returns work w/ mutable access to the plugin,
     ///
     /// Returns a join handle which will return work representing the running background task
+    #[inline]
     pub fn work_mut<F>(
         mut self,
         exec: impl FnOnce(&mut P, CancellationToken) -> F + Send + 'static,
@@ -92,6 +96,7 @@ impl<P: Plugin> Bind<P> {
     /// Consumes the call context and returns work w/ immutable access to the plugin,
     ///
     /// Returns a join handle which will return work representing the running background task
+    #[inline]
     pub fn work<F>(
         self,
         exec: impl FnOnce(&P, CancellationToken) -> F + Send + 'static,
@@ -119,5 +124,13 @@ impl<P: Plugin> Clone for Bind<P> {
             call: self.call.clone(),
             _bound: self._bound.clone(),
         }
+    }
+}
+
+impl<P: Plugin> Debug for Bind<P> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Bind")
+            .field("_bound", &self._bound)
+            .finish()
     }
 }

@@ -6,9 +6,16 @@ use crate::{
 };
 use runir::store::Item;
 use runir::{repo::Handle, repr::Attributes};
+use std::future::Future;
+use std::pin::Pin;
 use std::{collections::BTreeMap, path::PathBuf};
 use tokio_util::sync::CancellationToken;
+use tracing::debug;
 
+/// Type-alias for a boxed future
+type BoxFuture = Pin<Box<dyn Future<Output = Result<()>>>>;
+
+/// State contains manages registering and calling plugins
 pub struct State {
     /// Store for resources owned by this state
     store: runir::Store,
@@ -17,8 +24,6 @@ pub struct State {
     /// Handle to runtime to create work from state
     handle: tokio::runtime::Handle,
     /// Map of registered plugins
-    ///
-    /// A plugin can only be registered once
     plugins: BTreeMap<PathBuf, Handle>,
 }
 
@@ -26,6 +31,7 @@ impl State {
     /// Returns a new state
     ///
     /// Panic: Can panic if not called within a tokio runtime
+    #[inline]
     pub fn new() -> Self {
         Self {
             store: runir::Store::new(),
@@ -35,6 +41,8 @@ impl State {
         }
     }
 
+    /// Returns a new state w/ specified tokio runtime
+    #[inline]
     pub fn with(handle: tokio::runtime::Handle) -> Self {
         Self {
             store: runir::Store::new(),
@@ -44,7 +52,11 @@ impl State {
         }
     }
 
-    /// Initializes a new state inside of a tokio runtime
+    /// Initializes a new state
+    ///
+    /// **Note**: This call is safer since because when it is awaited, it will likely be inside of a tokio context
+    #[inline]
+    #[must_use]
     pub async fn init() -> Self {
         Self::new()
     }
@@ -62,7 +74,9 @@ impl State {
         self
     }
 
-    /// Calls a plugin, returns a future which can be awaited for the entire process
+    /// Calls a plugin, returns a future which can be awaited for the result
+    ///
+    /// Spawns the plugin immediately.
     ///
     /// ## Errors
     /// There are several error cases that can be returned
@@ -71,8 +85,19 @@ impl State {
     /// - If the plugin does not return work
     /// - If access to the plugin could not be established
     /// - If the plugin did not return work
-    #[must_use = "If the future is not awaited, then the call cannot be executed"]
+    #[inline]
     pub async fn call(&self, plugin: impl Into<PathBuf>) -> Result<()> {
+        let (f, _) = self.spawn(plugin)?;
+        f.await
+    }
+
+    /// Spawns the plugin
+    /// 
+    /// Returns the future and the associated cancellation token
+    pub fn spawn(
+        &self,
+        plugin: impl Into<PathBuf>,
+    ) -> Result<(BoxFuture, CancellationToken)> {
         let path = plugin.into();
         match self.plugins.get(&path).and_then(|h| {
             let id = h.commit();
@@ -81,14 +106,23 @@ impl State {
                 .zip(h.cast::<Attributes>().and_then(|a| a.get::<Thunk>()))
         }) {
             Some((item, thunk)) => {
+                let plugin_name = thunk.name().to_string();
+                debug!(name = plugin_name, "Preparing thunk");
+                let cancel = self.cancel.child_token();
                 let call = Call {
                     item: item.clone(),
-                    cancel: self.cancel.child_token(),
+                    cancel: cancel.clone(),
                     handle: self.handle.clone(),
                 };
 
-                let work = thunk.exec(call).await;
-                work?.await
+                Ok((
+                    Box::pin(async move {
+                        let work = thunk.exec(call).await?;
+                        debug!(name = plugin_name, "Thunk binding complete, executing");
+                        work.await
+                    }),
+                    cancel
+                ))
             }
             None => Err(Error::CouldNotFindPlugin),
         }

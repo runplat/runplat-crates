@@ -16,7 +16,7 @@ impl Future for Work {
     fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
         if self.cancel.is_cancelled() {
             self.task.abort();
-            return std::task::Poll::Ready(Err(Error::PluginAborted));
+            return std::task::Poll::Ready(Err(Error::PluginCallCancelled));
         }
         let task = &mut self.as_mut().task;
         let pinned = pin!(task);
