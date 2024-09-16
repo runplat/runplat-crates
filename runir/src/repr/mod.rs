@@ -1,9 +1,11 @@
 mod attribute;
 mod ty;
+mod labels;
 pub mod repo;
 pub use repo::Repo;
 pub use ty::TyRepr;
 pub use attribute::Attributes;
+pub use labels::Labels;
 use crate::Resource;
 use std::{any::TypeId, borrow::Cow, fmt::Debug, hash::Hash, pin::Pin, sync::Arc};
 

@@ -1,9 +1,12 @@
 use std::time::Duration;
-use runir::store::Item;
+use runir::Store;
 
 #[test]
 fn test_item_borrow_resource_multi_thread() {
-    let mut item = Item::from(String::from("HELLO WORLD"));
+    let mut store = Store::new();
+    let handle = store.put(String::from("HELLO WORLD")).commit();
+
+    let mut item = store.item(handle.commit()).unwrap().clone();
     let observe = item.observe();
     let mut cloned = item.clone();
     let _ = std::thread::Builder::new().spawn(move || {
@@ -20,7 +23,10 @@ fn test_item_borrow_resource_multi_thread() {
 
 #[test]
 fn test_item_borrow_resource_multi_thread_observe_timeout() {
-    let mut item = Item::from(String::from("HELLO WORLD"));
+    let mut store = Store::new();
+    let handle = store.put(String::from("HELLO WORLD")).commit();
+
+    let mut item = store.item(handle.commit()).unwrap().clone();
     let observe = item.observe_with_timeout(Duration::from_millis(100));
     let _ = std::thread::Builder::new().spawn(move || {
         std::thread::sleep(Duration::from_millis(200));

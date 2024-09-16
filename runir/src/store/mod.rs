@@ -32,7 +32,7 @@ impl Store {
         Self { repo: Repo::new(), items: BTreeMap::new() }
     }
 
-    // /// Prepares to put a resource into the store
+    /// Prepares to put a resource into the store
     #[must_use]
     #[inline]
     pub fn put<'a: 'b, 'b, R: Resource>(&'a mut self, resource: R) -> Put<'b, R> {
@@ -43,5 +43,11 @@ impl Store {
             ident: Identifier::Unit,
             attributes: Attributes::new(journal)
         }
+    }
+
+    /// Returns an item in the store mapped to the commit id
+    #[inline]
+    pub fn item(&self, commit: u64) -> Option<&Item> {
+        self.items.get(&commit)
     }
 }

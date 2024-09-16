@@ -33,6 +33,7 @@ impl<'put, R: Resource + Hash> Put<'put, R> {
     }
 
     /// Commits the resource to the store
+    #[inline]
     #[must_use]
     pub fn commit(self) -> Handle {
         let handle = self
@@ -42,9 +43,14 @@ impl<'put, R: Resource + Hash> Put<'put, R> {
             .ident(self.ident.clone())
             .complete();
 
-        self.store
-            .items
-            .insert(handle.commit(), Item::from(self.resource));
+        self.store.items.insert(
+            handle.commit(),
+            Item::new(
+                self.store.repo.journal.clone(),
+                handle.commit(),
+                self.resource,
+            ),
+        );
         handle
     }
 }

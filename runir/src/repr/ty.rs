@@ -19,6 +19,8 @@ pub struct TyRepr {
 }
 
 impl TyRepr {
+    /// Creates a new type representation without a value
+    #[inline]
     pub fn new<T: Resource>() -> Self {
         let name = std::any::type_name::<T>();
         let id = std::any::TypeId::of::<T>();
