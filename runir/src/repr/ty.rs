@@ -1,10 +1,10 @@
+use super::{Head, Repr, ReprHandle, ReprInternals};
+use crate::Resource;
 use std::{
     any::TypeId,
     hash::{Hash, Hasher},
     sync::Arc,
 };
-use crate::Resource;
-use super::{Head, Repr, ReprHandle, ReprInternals};
 
 /// Struct containing type information
 ///
@@ -70,17 +70,17 @@ impl ReprInternals for TyRepr {
     }
 
     fn head(&self) -> Head<Self> {
-        Head(Arc::pin(TyRepr {
+        Head::new(TyRepr {
             name: self.name,
             id: self.id,
             base_hash: self.base_hash,
-        }))
+        })
     }
 
     fn handle(&self) -> ReprHandle {
         ReprHandle {
             handle: self.base_hash,
-            head: self.head().0.clone(),
+            head: self.head().inner.clone(),
             link: 0,
         }
     }
@@ -100,18 +100,17 @@ mod tests {
 
     #[test]
     fn test_ty_repr() {
-        let journal = Journal::new();
         let test = Test;
         let repr = TyRepr::from(&test);
         let head = repr.head();
 
-        let handle = head.0.handle();
+        let handle = head.inner.handle();
         assert!(handle.handle() > 0);
         let head = Kind::Interned(head);
-        let mapped = head.map(handle.clone(), "test", TyRepr::from(&Test), journal.clone());
+        let mapped = head.map(handle.clone(), "test", TyRepr::from(&Test));
 
         let (handle, test) = mapped.get(handle, "test").expect("should exist");
-        assert_eq!(repr.base_hash, test.0.base_hash);
+        assert_eq!(repr.base_hash, test.inner.base_hash);
         assert!(handle.link() > 0);
     }
 }

@@ -1,7 +1,8 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 
 use crate::{Journal, Repr, ReprInternals, Resource, TyRepr};
 
+#[derive(Clone)]
 pub struct Attributes {
     pub(crate) attrs: BTreeMap<u64, u64>,
     journal: Journal,
@@ -9,7 +10,10 @@ pub struct Attributes {
 
 impl Attributes {
     pub fn new(journal: Journal) -> Self {
-        Self { attrs: BTreeMap::new(), journal }
+        Self {
+            attrs: BTreeMap::new(),
+            journal,
+        }
     }
     /// Gets an attribute
     #[inline]
@@ -19,6 +23,14 @@ impl Attributes {
             .get(&attr.handle().handle())
             .and_then(|l| self.journal.get(*l))
             .and_then(|l| l.cast::<R>())
+    }
+}
+
+impl Debug for Attributes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Attributes")
+            .field("attrs", &self.attrs)
+            .finish()
     }
 }
 

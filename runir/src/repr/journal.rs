@@ -25,9 +25,8 @@ impl Journal {
 
     /// Log a handle to an ident and return the "link" value
     #[inline]
-    pub fn log<'a>(&self, ident: impl Into<Identifier<'a>>, handle: ReprHandle) -> u64 {
-        let ident: Identifier = ident.into();
-        self.log.record(&ident, &handle)
+    pub fn log<'a>(&self, handle: ReprHandle) -> u64 {
+        self.log.record(&handle)
     }
 
     /// Returns a repr handle mapped to a link value
@@ -71,12 +70,8 @@ impl Log {
 
     /// Records a handle and returns the link value that can be used for later retrieval
     #[inline]
-    fn record<'a>(&self, ident: &Identifier<'a>, handle: &ReprHandle) -> u64 {
-        let link = match ident {
-            Identifier::Str(s) => handle.head.internals().link_hash_str(s),
-            Identifier::Id(id) => handle.head.internals().link_hash_id(*id),
-        };
-
+    fn record<'a>(&self, handle: &ReprHandle) -> u64 {
+        let link = handle.link();
         let snapshot = self.snapshot();
 
         if snapshot.contains_key(&link) {
@@ -123,7 +118,6 @@ impl Resource for Journal {}
 fn test_journal() {
     let journal = Journal::new();
     let link = journal.log(
-        "test",
         crate::ReprInternals::handle(&crate::repr::ty::TyRepr::new::<String>()),
     );
     assert!(link > 0);

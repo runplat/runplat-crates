@@ -1,17 +1,12 @@
 use super::*;
 
 /// Struct for a repo storing representation data for objects
+#[derive(Clone)]
 pub struct Repo<R: Repr> {
     /// Tree storing representations for this table
-    tree: Tree<R>,
+    tree: BTreeMap<u64, Kind<R>>,
     /// Journal storing repr's that have been checked out
     pub(crate) journal: Journal,
-}
-
-/// Contains a tree of representations
-struct Tree<R: Repr> {
-    /// Inner map
-    inner: BTreeMap<u64, Kind<R>>,
 }
 
 impl<R: Repr> Repo<R> {
@@ -22,7 +17,7 @@ impl<R: Repr> Repo<R> {
     #[inline]
     pub fn new() -> Self {
         Self {
-            tree: Tree::new(),
+            tree: BTreeMap::new(),
             journal: Journal::new(),
         }
     }
@@ -56,6 +51,17 @@ impl<R: Repr> Repo<R> {
         }
     }
 
+    /// Begins an add operation for use with a `Store`
+    #[inline]
+    #[must_use = "When adding a representation for a resource, the output of this function must be used in conjunction with Store::put(..)"]
+    pub fn add(&mut self, repr: R) -> Add<'_, R> {
+        Add {
+            repo: self,
+            repr,
+            ident: Identifier::Unit
+        }
+    }
+
     /// Resolves a link into a handle by searching journaled logs
     /// 
     /// Returns None if the representation has never been accessed
@@ -67,21 +73,22 @@ impl<R: Repr> Repo<R> {
     /// Returns a reference for a node searching by handle
     #[inline]
     pub fn get(&self, handle: &ReprHandle) -> Option<&Kind<R>> {
-        self.tree.get(handle.clone())
+        self.tree.get(&handle.handle())
     }
 
     /// Returns a mutable reference for a node searching by handle
     #[inline]
     pub fn get_mut(&mut self, handle: &ReprHandle) -> Option<&mut Kind<R>> {
-        self.tree.get_mut(handle.clone())
+        self.tree.get_mut(&handle.handle())
     }
 
     /// Inserts a new node directly into the inner tree
     #[inline]
     pub(crate) fn insert(&mut self, handle: u64, node: impl Into<Kind<R>>) {
-        self.tree.inner.insert(handle, node.into());
+        self.tree.insert(handle, node.into());
     }
 
+    /// Returns a type handle for a resource
     #[inline]
     fn type_handle<Res: Resource>(&self, resource: &Res) -> ReprHandle {
         let ty_repr = TyRepr::from(resource);
@@ -89,51 +96,7 @@ impl<R: Repr> Repo<R> {
     }
 }
 
-impl<R: Repr> Tree<R> {
-    // /// Inserts a "branch" into the map, returns the previous value if a previous entry existed
-    // pub fn branch(&mut self, repr: R) -> Option<Kind<R>>
-    // where
-    //     R: ReprInternals,
-    // {
-    //     let head = repr.head();
-    //     let branch = Kind::Internable(head);
-    //     let handle = R::handle_of(branch.clone());
-    //     self.inner.insert(handle.handle(), branch)
-    // }
-
-    /// Creates a new tree
-    pub const fn new() -> Self {
-        Tree {
-            inner: BTreeMap::new(),
-        }
-    }
-
-    /// Get a representation from a ReprHandle
-    pub fn get(&self, handle: ReprHandle) -> Option<&Kind<R>> {
-        self.inner.get(&handle.handle())
-    }
-
-    /// Get a representation from a ReprHandle
-    pub fn get_mut(&mut self, handle: ReprHandle) -> Option<&mut Kind<R>> {
-        self.inner.get_mut(&handle.handle())
-    }
-}
-
 impl<R: Repr> Default for Repo<R> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<R: Repr> Clone for Tree<R> {
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-        }
-    }
-}
-
-impl<R: Repr> Default for Tree<R> {
     fn default() -> Self {
         Self::new()
     }

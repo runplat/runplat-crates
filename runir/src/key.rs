@@ -7,14 +7,3 @@ pub struct Key {
     /// The UUID layout is used to store data on a key
     pub data: u128,
 }
-
-impl<R> From<&R> for Key
-where
-    R: Resource,
-{
-    fn from(value: &R) -> Self {
-        let id = value.type_id();
-
-        todo!()
-    }
-}

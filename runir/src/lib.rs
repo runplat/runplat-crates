@@ -16,7 +16,7 @@ mod attribute;
 mod key;
 mod repr;
 mod resource;
-mod store;
+pub mod store;
 
 pub use attribute::Attributes;
 pub use key::Key;

@@ -1,19 +1,21 @@
-mod config;
+mod add;
 mod checkout;
+mod config;
 mod journal;
 mod map;
 mod repo;
 mod ty;
 
-pub use map::Map;
-pub use config::Config;
+pub use add::Add;
 pub use checkout::Checkout;
+pub use config::Config;
 pub use journal::Journal;
-pub use ty::TyRepr;
+pub use map::Map;
 pub use repo::Repo;
+pub use ty::TyRepr;
 
 use crate::Resource;
-use std::{any::TypeId, collections::BTreeMap, fmt::Debug, pin::Pin, sync::Arc};
+use std::{any::TypeId, borrow::Cow, collections::BTreeMap, fmt::Debug, pin::Pin, sync::Arc};
 
 /// Type-alias for a dynamic head repr
 type DynHead = Pin<Arc<dyn Repr>>;
@@ -22,8 +24,10 @@ type DynHead = Pin<Arc<dyn Repr>>;
 type OrderedReprMap<R> = BTreeMap<u64, Head<R>>;
 
 /// Enumeration of identifier variants
+#[derive(Clone)]
 pub enum Identifier<'a> {
-    Str(&'a str),
+    Unit,
+    Str(Cow<'a, str>),
     Id(usize),
 }
 
@@ -65,7 +69,10 @@ pub trait ReprInternals: Sized + Repr {
 }
 
 /// Struct containing the head representation value
-pub struct Head<R>(pub Pin<Arc<R>>);
+pub struct Head<R> {
+    pub inner: Pin<Arc<R>>,
+    journal: Journal,
+}
 
 /// Enumeration of kinds of representations
 pub enum Kind<R: Repr> {
@@ -81,15 +88,13 @@ pub enum Kind<R: Repr> {
         head: Head<R>,
         /// Thread-safe ordered map of identifiers mapped to Head values
         map: OrderedReprMap<R>,
-        /// Handle checkout journal
-        journal: Journal,
     },
 }
 
 /// Handle containing lookup keys for storing representations
-/// 
+///
 /// Can be used to access the representation directly later.
-/// 
+///
 /// Also, the link value can be used to retrieve this handle from a journal,
 /// if the handle was created from `checkout()`,
 #[derive(Clone)]
@@ -105,7 +110,17 @@ pub struct ReprHandle {
 impl<R> Head<R> {
     /// Creates a new repr head
     pub fn new(repr: R) -> Self {
-        Head(Arc::pin(repr))
+        Head {
+            inner: Arc::pin(repr),
+            journal: Journal::new(),
+        }
+    }
+
+    pub fn next(&self, repr: R) -> Self {
+        Self {
+            inner: Arc::pin(repr),
+            journal: self.journal.clone(),
+        }
     }
 }
 
@@ -118,37 +133,31 @@ impl<R: Repr> Kind<R> {
     }
 
     /// Maps a repr to an ident
-    pub fn map<'a>(
-        self,
-        handle: ReprHandle,
-        ident: impl Into<Identifier<'a>>,
-        repr: R,
-        journal: Journal,
-    ) -> Kind<R> {
+    pub fn map<'a>(self, handle: ReprHandle, ident: impl Into<Identifier<'a>>, repr: R) -> Kind<R> {
         let ident = ident.into();
         let next = handle.link_to(ident);
         match self {
-            Kind::Interned(head) => Kind::Mapped {
-                head,
-                map: {
-                    let mut map = BTreeMap::new();
-                    map.insert(next.link(), Head::new(repr));
-                    map
-                },
-                journal,
-            },
-            Kind::Mapped {
-                head,
-                mut map,
-                journal,
-            } => Kind::Mapped {
-                head,
-                map: {
-                    map.insert(next.link(), Head::new(repr));
-                    map
-                },
-                journal,
-            },
+            Kind::Interned(head) => {
+                let n = head.next(repr);
+                Kind::Mapped {
+                    head,
+                    map: {
+                        let mut map = BTreeMap::new();
+                        map.insert(next.link(), n);
+                        map
+                    },
+                }
+            }
+            Kind::Mapped { head, mut map } => {
+                let n = head.next(repr);
+                Kind::Mapped {
+                    head,
+                    map: {
+                        map.insert(next.link(), n);
+                        map
+                    },
+                }
+            }
         }
     }
 
@@ -161,11 +170,14 @@ impl<R: Repr> Kind<R> {
         ident: impl Into<Identifier<'a>>,
     ) -> Option<(ReprHandle, &Head<R>)> {
         match self {
-            Kind::Interned(_) => None,
-            Kind::Mapped { map, journal, .. } => {
+            Kind::Interned(h) => {
+                let handle = handle.link_to(ident.into());
+                Some((handle.checkout(h.clone()), h))
+            },
+            Kind::Mapped { map, .. } => {
                 let handle = handle.link_to(ident.into());
                 map.get(&handle.link())
-                    .map(|v| (handle.checkout(v.clone(), journal.clone()), v))
+                    .map(|v| (handle.checkout(v.clone()), v))
             }
         }
     }
@@ -213,8 +225,9 @@ impl ReprHandle {
     #[inline]
     pub(crate) fn link_to<'a>(&self, ident: impl Into<Identifier<'a>>) -> ReprHandle {
         let link = match ident.into() {
-            Identifier::Str(ident) => self.head.internals().link_hash_str(ident),
+            Identifier::Str(ident) => self.head.internals().link_hash_str(&ident),
             Identifier::Id(ident) => self.head.internals().link_hash_id(ident),
+            Identifier::Unit => 0,
         };
 
         ReprHandle {
@@ -232,15 +245,15 @@ impl ReprHandle {
 
     /// Returns this handle with a different head pointer and link setting
     #[inline]
-    pub(crate) fn checkout<R: Repr>(&self, head: Head<R>, journal: Journal) -> ReprHandle {
-        let head = head.0.clone();
+    pub(crate) fn checkout<R: Repr>(&self, head: Head<R>) -> ReprHandle {
+        let _head = head.inner.clone();
 
         let mut handle = ReprHandle {
             handle: self.handle,
             link: 0,
-            head,
+            head: _head,
         };
-        handle.link = journal.log(self.link as usize, handle.clone());
+        handle.link = head.journal.log(handle.clone());
         handle
     }
 }
@@ -252,10 +265,9 @@ impl<R: Repr> Clone for Kind<R> {
     fn clone(&self) -> Self {
         match self {
             Self::Interned(arg0) => Self::Interned(arg0.clone()),
-            Self::Mapped { head, map, journal } => Self::Mapped {
+            Self::Mapped { head, map } => Self::Mapped {
                 head: head.clone(),
                 map: map.clone(),
-                journal: journal.clone(),
             },
         }
     }
@@ -263,7 +275,10 @@ impl<R: Repr> Clone for Kind<R> {
 
 impl<R> Clone for Head<R> {
     fn clone(&self) -> Self {
-        Self(self.0.clone())
+        Self {
+            inner: self.inner.clone(),
+            journal: self.journal.clone(),
+        }
     }
 }
 
@@ -275,7 +290,7 @@ impl<R: Repr> From<Head<R>> for Kind<R> {
 
 impl<'a> From<&'a str> for Identifier<'a> {
     fn from(value: &'a str) -> Self {
-        Self::Str(value)
+        Self::Str(Cow::from(value))
     }
 }
 
