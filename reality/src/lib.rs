@@ -1,14 +1,35 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
+mod plugin;
+
+pub type Result<T> = std::result::Result<T, Error>;
+
+pub enum Error {
+    PluginAborted,
+    TokioJoinError
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+impl From<tokio::task::JoinError> for Error {
+    fn from(_: tokio::task::JoinError) -> Self {
+        Self::TokioJoinError
+    }
+}
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+mod tests {
+    use crate::plugin::{Namespace, Plugin};
+
+    struct TestPlugin;
+
+    impl Plugin for TestPlugin {
+        fn namespace() -> crate::plugin::Namespace {
+            Namespace::default()
+        }
+    
+        fn call(context: crate::plugin::Context) -> Option<crate::plugin::AsyncContext> {
+            let tc = context.clone();
+            Some(context.spawn(|_| async {
+                let item = tc.store().item(0).cloned();
+
+                Ok(tc)
+            }))
+        }
     }
 }

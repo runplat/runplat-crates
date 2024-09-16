@@ -5,3 +5,5 @@ edition = "2021"
 
 [dependencies]
 runir = { path = "../runir" }
+tokio = { version = "1.40.0", features = ["full"] }
+tokio-util = "0.7.12"
