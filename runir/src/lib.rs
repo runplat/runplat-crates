@@ -1,44 +1,27 @@
-//! Runtime Intermediate Representation
-//! 
-//! Key --> Resource
-//! 
-//! Key: [Attribute]
-//! 
-//! Attribute --> Repr
+//! # Runtime Intermediate Representation
+//!
+//! This library is for building an runtime intermediate representations of resources and their associated representations consumed during runtime.
+//!
+//! The three main modules are `store`, `repo`, and `repr`.
+//!
+//! The entrypoint to use this library is the "Store" type. The store centralizes resource state in a single location returning "Handles" that can be used to fetch
+//! metadata for stored resources.
+//!
+//! The important thing is that the returned handle will always have a unique "commit" id which is a u64 value that can be passed around as a key to the resource.
 
-mod repr;
-mod key;
-mod attribute;
-mod resource;
+pub mod repr;
+pub use repr::repo;
+pub mod store;
+pub use store::Store;
 
-pub use key::Key;
-pub use resource::Resource;
+/// Trait representing a dynamic resource which can be stored and retrieved
+pub trait Resource: std::any::Any + Send + Sync + 'static {}
 
-
-/// Trait describing runtime storage of resources
-pub trait Storage {
-    /// Associated type containing a resource
-    type Cell<T> where T: Resource;
-
-    /// Container for borrowing a resource from the storage target
-    type BorrowResource<'a, T: Resource>: std::ops::Deref<Target = T> + Send + Sync
-    where
-        Self: 'a;
-
-    /// Container for mutably borrowing a resource from the storage target
-    type BorrowMutResource<'a, T: Resource>: std::ops::Deref<Target = T>
-        + std::ops::DerefMut<Target = T>
-        + Send
-        + Sync
-    where
-        Self: 'a;
-
-
-    /// Put a resource into storage
-    /// 
-    /// If the resource could be put into storage, a key can be returned for further configuration
-    fn put_resource<'a: 'b, 'b, T: Resource>(
-        &'a mut self,
-        resource: T
-    ) -> Option<&'b mut Key>;
-}
+impl Resource for String {}
+impl Resource for bool {}
+impl Resource for u128 {}
+impl Resource for u64 {}
+impl Resource for u32 {}
+impl Resource for usize {}
+impl Resource for f64 {}
+impl Resource for f32 {}

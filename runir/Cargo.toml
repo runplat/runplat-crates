@@ -4,4 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+futures-lite = "2.3.0"
 uuid = "1.10.0"
+
+[[test]]
+name = "test_item_observation"
