@@ -1,8 +1,9 @@
-use crate::{Attributes, Identifier, Repo, Repr, ReprHandle, ReprInternals, Resource, TyRepr};
+use std::hash::Hash;
 
-use super::{Item, Store};
+use super::*;
+use crate::{repo::Handle, repr::Repr};
 
-pub struct Put<'put, R: Resource> {
+pub struct Put<'put, R> {
     pub(crate) store: &'put mut Store,
     pub(crate) resource: R,
     pub(crate) attributes: Attributes,
@@ -10,13 +11,17 @@ pub struct Put<'put, R: Resource> {
     pub(crate) ident: Identifier<'put>,
 }
 
-impl<'put, R: Resource> Put<'put, R> {
+impl<'put, R: Resource + Hash> Put<'put, R> {
     /// Adds an attribute for this resource
     #[inline]
-    pub fn add<Attr: Repr>(&mut self, mut add: crate::repr::Add<'put, Attr>) -> &mut Self {
-        add.ident(self.ident.clone());
-        let repr = add.complete(&self.resource);
-        self.attributes.attrs.insert(repr.handle(), repr.link());
+    pub fn add<Attr: Repr + Hash>(mut self, attr: Attr) -> Self {
+        let handle = self
+            .store
+            .repo
+            .assign(attr, &self.resource)
+            .ident(self.ident.clone())
+            .complete();
+        self.attributes.insert::<Attr>(&handle);
         self
     }
 
@@ -29,36 +34,37 @@ impl<'put, R: Resource> Put<'put, R> {
 
     /// Commits the resource to the store
     #[must_use]
-    pub fn commit(self) -> ReprHandle {
-        // Complete adding the attribute for the resource
-        let attrs = self.store.attrs.add(self.attributes);
-        let handle = attrs.complete(&self.resource);
+    pub fn commit(self) -> Handle {
+        let handle = self
+            .store
+            .repo
+            .assign(self.attributes, &self.resource)
+            .ident(self.ident.clone())
+            .complete();
+
         self.store
             .items
-            .insert(handle.link(), Item::from(self.resource));
+            .insert(handle.commit(), Item::from(self.resource));
         handle
     }
 }
 
-#[test]
-fn test_put_resource_add_attr() {
-    let mut store = Store::new();
-    let mut repo = store.attrs.branch::<TyRepr>();
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::repr::TyRepr;
 
-    let mut put = store.put(String::from("hello world"));
+    #[test]
+    fn test_put_resource_add_attr() {
+        let mut store = Store::new();
 
-    put.add(repo.add(TyRepr::new::<u64>()));
-    let id = put.commit();
+        let handle = store
+            .put(String::from("hello world"))
+            .add(TyRepr::new::<u64>())
+            .commit();
 
-    let handle = store.attrs.get(&id).unwrap();
-    handle.get(id.clone(), Identifier::Unit);
-    eprintln!("{id:?} -- {:?}", store.attrs.journal.logs());
-    let casting = handle.interned();
-    eprintln!("{:?}", casting.inner);
-
-    let test = TyRepr::new::<TyRepr>();
-    eprintln!("{:?}", test.handle());
-
-    let t = casting.inner.get::<TyRepr>();
-    eprintln!("{t:?}");
+        let attributes = handle.cast::<Attributes>().expect("should have attributes");
+        let ty_repr = attributes.get::<TyRepr>().expect("should have a ty_repr");
+        assert_eq!(ty_repr.as_ref(), &TyRepr::new::<u64>())
+    }
 }

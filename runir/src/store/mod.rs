@@ -1,16 +1,16 @@
 mod put;
-mod entity;
 mod item;
 mod observe;
 
 use std::collections::BTreeMap;
 
-pub use entity::Entity;
 pub use item::Item;
+
 pub use observe::ObservationEvent;
 
 pub use put::Put;
-use crate::{attribute::Attributes, Identifier, Repo, Resource};
+
+use crate::{repr::{Attributes, Identifier, Repo}, Resource};
 
 /// Represents resources consumed by the application in a single map
 /// 
@@ -21,27 +21,27 @@ use crate::{attribute::Attributes, Identifier, Repo, Resource};
 pub struct Store {
     /// Items in the store
     items: BTreeMap<u64, Item>,
-    /// Repository of attributes for stored resources
-    attrs: Repo<Attributes>,
+    /// Repository of resource representation data
+    repo: Repo,
 }
 
 impl Store {
     /// Returns a new store
     #[inline]
     pub fn new() -> Self {
-        Self { attrs: Repo::new(), items: BTreeMap::new() }
+        Self { repo: Repo::new(), items: BTreeMap::new() }
     }
 
-    /// Prepares to put a resource into the store
+    // /// Prepares to put a resource into the store
     #[must_use]
     #[inline]
     pub fn put<'a: 'b, 'b, R: Resource>(&'a mut self, resource: R) -> Put<'b, R> {
-        let journal = self.attrs.journal.clone();
+        let journal = self.repo.journal.clone();
         Put {
             store: self,
-            attributes: Attributes::new(journal),
             resource,
-            ident: Identifier::Unit
+            ident: Identifier::Unit,
+            attributes: Attributes::new(journal)
         }
     }
 }

@@ -7,9 +7,5 @@ edition = "2021"
 futures-lite = "2.3.0"
 uuid = "1.10.0"
 
-[features]
-observe = []
-
 [[test]]
 name = "test_item_observation"
-required-features = ["observe"]

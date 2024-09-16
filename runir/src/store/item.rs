@@ -2,7 +2,7 @@ use crate::Resource;
 use std::{
     any::TypeId,
     pin::Pin,
-    sync::{Arc, RwLock},
+    sync::{Arc, RwLock}, time::Duration,
 };
 
 use super::ObservationEvent;
@@ -40,7 +40,6 @@ impl Item {
                 let cast = cast_mut_ref(inner).cast::<T>();
                 let cast = cast.as_mut();
 
-                #[cfg(feature = "observe")]
                 if cast.is_some() {
                     if let Some(obvs) = self.observe.take() {
                         let sync = &*obvs.sync;
@@ -82,7 +81,6 @@ impl Item {
     }
 
     /// Observes access on the item
-    #[cfg(feature = "observe")]
     pub fn observe(&mut self) -> ObservationEvent {
         let obvs = ObservationEvent::new();
         self.observe = Some(obvs.clone());
@@ -90,7 +88,6 @@ impl Item {
     }
 
     /// Observes access on the item with a timeout
-    #[cfg(feature = "observe")]
     pub fn observe_with_timeout(&mut self, timeout: Duration) -> ObservationEvent {
         let mut obvs = ObservationEvent::new();
         obvs.timeout(timeout);

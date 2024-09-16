@@ -1,15 +1,14 @@
-use super::{Head, Repr, ReprHandle, ReprInternals};
+use super::{Repr, ReprInternals};
 use crate::Resource;
 use std::{
     any::TypeId,
     hash::{Hash, Hasher},
-    sync::Arc,
 };
 
 /// Struct containing type information
 ///
 /// Also serves as the common ReprInternals implementation
-#[derive(Debug)]
+#[derive(Debug, Hash, PartialEq, PartialOrd)]
 pub struct TyRepr {
     /// Name of the type
     name: &'static str,
@@ -68,49 +67,11 @@ impl ReprInternals for TyRepr {
         identifier.hash(&mut hasher);
         hasher.finish()
     }
-
-    fn head(&self) -> Head<Self> {
-        Head::new(TyRepr {
-            name: self.name,
-            id: self.id,
-            base_hash: self.base_hash,
-        })
-    }
-
-    fn handle(&self) -> ReprHandle {
-        ReprHandle {
-            handle: self.base_hash,
-            head: self.head().inner.clone(),
-            link: 0,
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::TyRepr;
-    use crate::{
-        repr::{journal::Journal, Kind, ReprInternals},
-        Resource,
-    };
-
-    struct Test;
-
-    impl Resource for Test {}
-
-    #[test]
-    fn test_ty_repr() {
-        let test = Test;
-        let repr = TyRepr::from(&test);
-        let head = repr.head();
-
-        let handle = head.inner.handle();
-        assert!(handle.handle() > 0);
-        let head = Kind::Interned(head);
-        let mapped = head.map(handle.clone(), "test", TyRepr::from(&Test));
-
-        let (handle, test) = mapped.get(handle, "test").expect("should exist");
-        assert_eq!(repr.base_hash, test.inner.base_hash);
-        assert!(handle.link() > 0);
+    
+    fn link_hash(&self, hash: impl Hash) -> u64 {
+        let mut hasher = std::hash::DefaultHasher::new();
+        self.base_hash.hash(&mut hasher);
+        hash.hash(&mut hasher);
+        hasher.finish()
     }
 }

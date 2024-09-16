@@ -1,9 +1,5 @@
-use crate::Resource;
 use std::{
-    any::TypeId,
-    ops::{Deref, DerefMut},
-    pin::Pin,
-    sync::{Arc, Condvar, Mutex, RwLock},
+    sync::{Arc, Condvar, Mutex},
     time::{Duration, Instant},
 };
 
