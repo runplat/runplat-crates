@@ -69,7 +69,7 @@ impl ReprInternals for TyRepr {
         identifier.hash(&mut hasher);
         hasher.finish()
     }
-    
+
     fn link_hash(&self, hash: impl Hash) -> u64 {
         let mut hasher = std::hash::DefaultHasher::new();
         self.base_hash.hash(&mut hasher);

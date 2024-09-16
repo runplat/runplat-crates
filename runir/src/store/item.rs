@@ -1,8 +1,4 @@
-use crate::{
-    repo::Journal,
-    repr::Attributes,
-    Resource,
-};
+use crate::{repo::Journal, repr::Attributes, Resource};
 use std::{
     any::TypeId,
     pin::Pin,
@@ -164,7 +160,7 @@ mod tests {
         let mut store = Store::new();
         let handle = store
             .put(String::from("HELLO WORLD"))
-            .add(TyRepr::new::<u64>())
+            .attr(TyRepr::new::<u64>())
             .commit();
 
         let item = store.item(handle.commit()).unwrap();

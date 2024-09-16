@@ -22,7 +22,11 @@ pub struct Handle {
 impl Handle {
     /// Creates a new handle
     pub fn new<R: Repr>(commit: u64, repr: DynHead) -> Self {
-        Self { commit, cast: TypeId::of::<R>(), repr }
+        Self {
+            commit,
+            cast: TypeId::of::<R>(),
+            repr,
+        }
     }
 
     /// Returns the "commit" value this handle represents
@@ -42,15 +46,15 @@ impl Handle {
     /// If the target type is not the same as the current head, None is returned
     #[inline]
     pub fn cast<T: Repr>(&self) -> Option<Arc<T>> {
-        if  TypeId::of::<T>() != self.cast {
+        if TypeId::of::<T>() != self.cast {
             return None;
         }
         unsafe {
-            let inner =  Pin::into_inner_unchecked(self.repr.clone());
+            let inner = Pin::into_inner_unchecked(self.repr.clone());
             let addr = Arc::into_raw(inner);
             let inner = Arc::<T>::from_raw(addr.cast::<T>());
             Some(inner)
-         }
+        }
     }
 }
 

@@ -1,6 +1,6 @@
-use std::{collections::BTreeMap, fmt::Debug, hash::Hash, sync::Arc};
-use repo::{Handle, Journal};
 use super::*;
+use repo::{Handle, Journal};
+use std::{collections::BTreeMap, fmt::Debug, hash::Hash, sync::Arc};
 
 /// Maps attribute typtes to their commit id in the journal
 #[derive(Clone)]
@@ -24,7 +24,8 @@ impl Attributes {
     /// Inserts a new handle into attributes
     #[inline]
     pub fn insert<Attribute: Repr>(&mut self, handle: &Handle) {
-        self.attrs.insert(Self::get_ty_bits::<Attribute>(), handle.commit());
+        self.attrs
+            .insert(Self::get_ty_bits::<Attribute>(), handle.commit());
     }
 
     /// Gets an attribute
@@ -37,7 +38,9 @@ impl Attributes {
 
     /// Returns the hi bits for an attribute
     fn get_ty_bits<Attribute: Repr>() -> u64 {
-        let (hi, _) = TyRepr::new::<Attribute>().hash_uuid::<Attribute>().as_u64_pair();
+        let (hi, _) = TyRepr::new::<Attribute>()
+            .hash_uuid::<Attribute>()
+            .as_u64_pair();
         hi
     }
 }

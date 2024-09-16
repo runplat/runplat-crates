@@ -1,10 +1,10 @@
+use super::Handle;
+use crate::Resource;
 use std::{
     collections::BTreeMap,
     ops::Deref,
     sync::{Arc, Mutex},
 };
-use super::Handle;
-use crate::Resource;
 
 /// Type-alias for the main synchronization primative
 type SyncContext = Arc<Mutex<LogState>>;
@@ -25,7 +25,7 @@ impl Journal {
 
     /// Log a handle to an ident and return the "link" value
     #[inline]
-    pub fn log<'a>(&self, handle: Handle) -> u64 {
+    pub fn log(&self, handle: Handle) -> u64 {
         self.log.record(&handle)
     }
 
@@ -70,7 +70,7 @@ impl Log {
 
     /// Records a handle and returns the link value that can be used for later retrieval
     #[inline]
-    fn record<'a>(&self, handle: &Handle) -> u64 {
+    fn record(&self, handle: &Handle) -> u64 {
         let commit = handle.commit();
         let snapshot = self.snapshot();
 
@@ -109,6 +109,12 @@ impl Deref for LogSnapshot {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl Default for Journal {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

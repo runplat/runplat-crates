@@ -63,7 +63,8 @@ impl ObservationEvent {
             match sync.1.wait_timeout_while(guard, timeout, |o| !o.accessed) {
                 Ok(g) => g,
                 Err(err) => err.into_inner(),
-            }.0
+            }
+            .0
         } else {
             match sync.1.wait_while(guard, |o| !o.accessed) {
                 Ok(g) => g,

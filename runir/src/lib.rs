@@ -1,12 +1,12 @@
 //! # Runtime Intermediate Representation
-//! 
+//!
 //! This library is for building an runtime intermediate representations of resources and their associated representations consumed during runtime.
-//! 
+//!
 //! The three main modules are `store`, `repo`, and `repr`.
-//! 
+//!
 //! The entrypoint to use this library is the "Store" type. The store centralizes resource state in a single location returning "Handles" that can be used to fetch
 //! metadata for stored resources.
-//! 
+//!
 //! The important thing is that the returned handle will always have a unique "commit" id which is a u64 value that can be passed around as a key to the resource.
 
 pub mod repr;

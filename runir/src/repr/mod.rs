@@ -1,13 +1,13 @@
 mod attribute;
-mod ty;
 mod labels;
 pub mod repo;
-pub use repo::Repo;
-pub use ty::TyRepr;
+mod ty;
+use crate::Resource;
 pub use attribute::Attributes;
 pub use labels::Labels;
-use crate::Resource;
+pub use repo::Repo;
 use std::{any::TypeId, borrow::Cow, fmt::Debug, hash::Hash, pin::Pin, sync::Arc};
+pub use ty::TyRepr;
 
 /// Enumeration of identifier variants
 #[derive(Clone)]
@@ -46,14 +46,14 @@ pub trait ReprInternals: Sized + Repr {
     fn link_hash_id(&self, identifier: usize) -> u64;
 
     /// Returns a "link" value of a representation instance after "hashing" an identifier
-    /// 
+    ///
     /// **Note**: Since this is a hash function, it must return the same value for the same identifier
     fn link_hash(&self, hash: impl Hash) -> u64;
 
     /// Returns a uuid that can be used for hashing
-    fn hash_uuid<T>(&self) -> uuid::Uuid 
+    fn hash_uuid<T>(&self) -> uuid::Uuid
     where
-        T: Sized
+        T: Sized,
     {
         let hi = self.link_hash_id(0);
         uuid::Uuid::from_u64_pair(hi, 0)

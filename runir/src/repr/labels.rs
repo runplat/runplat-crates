@@ -37,8 +37,8 @@ impl Deref for Labels {
 
 #[cfg(test)]
 mod tests {
-    use crate::{repr::Attributes, Store};
     use super::*;
+    use crate::{repr::Attributes, Store};
 
     #[test]
     fn test_labels() {
@@ -46,7 +46,7 @@ mod tests {
 
         let handle = store
             .put(String::from("hello world"))
-            .add(Labels::from(
+            .attr(Labels::from(
                 &[("name", "random string"), ("media-type", "rust string")][..],
             ))
             .commit();

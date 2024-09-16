@@ -1,16 +1,16 @@
 mod add;
 mod commit;
-mod head;
 mod handle;
+mod head;
 mod journal;
 
-pub use journal::Journal;
-pub use handle::Handle;
 pub use add::Add;
 pub use commit::Commit;
+pub use handle::Handle;
+pub use journal::Journal;
 
-use head::Head;
 use super::*;
+use head::Head;
 
 /// Struct for a repo storing representation data for objects
 #[derive(Clone)]
@@ -32,7 +32,7 @@ impl Repo {
     }
 
     /// Prepares to commit a new representation to the current repo
-    /// 
+    ///
     /// Commits a representation to the current repo
     #[inline]
     #[must_use]
@@ -52,7 +52,7 @@ impl Repo {
     }
 
     /// Begins an assign operation for use with a `Store`
-    /// 
+    ///
     /// Assign will assign an attribute that implements Repr to a resource. Both must be hashable. The assignment is unique to the specific repr.
     #[inline]
     #[must_use = "When adding a representation for a resource, the output of this function must be used in conjunction with Store::put(..)"]

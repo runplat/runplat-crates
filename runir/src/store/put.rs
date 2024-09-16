@@ -3,9 +3,13 @@ use std::hash::Hash;
 use super::*;
 use crate::{repo::Handle, repr::Repr};
 
+/// Constructs a "put" operation to the store
 pub struct Put<'put, R> {
+    /// Store being modified
     pub(crate) store: &'put mut Store,
+    /// Resource being put into the store
     pub(crate) resource: R,
+    /// Attributes map for this resource
     pub(crate) attributes: Attributes,
     /// Identifier for this resource
     pub(crate) ident: Identifier<'put>,
@@ -14,7 +18,7 @@ pub struct Put<'put, R> {
 impl<'put, R: Resource + Hash> Put<'put, R> {
     /// Adds an attribute for this resource
     #[inline]
-    pub fn add<Attr: Repr + Hash>(mut self, attr: Attr) -> Self {
+    pub fn attr<Attr: Repr + Hash>(mut self, attr: Attr) -> Self {
         let handle = self
             .store
             .repo
@@ -66,7 +70,7 @@ mod tests {
 
         let handle = store
             .put(String::from("hello world"))
-            .add(TyRepr::new::<u64>())
+            .attr(TyRepr::new::<u64>())
             .commit();
 
         let attributes = handle.cast::<Attributes>().expect("should have attributes");

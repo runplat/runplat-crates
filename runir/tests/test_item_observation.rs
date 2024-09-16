@@ -1,5 +1,5 @@
-use std::time::Duration;
 use runir::Store;
+use std::time::Duration;
 
 #[test]
 fn test_item_borrow_resource_multi_thread() {
