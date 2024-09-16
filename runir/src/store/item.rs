@@ -111,6 +111,12 @@ impl Item {
         }
     }
 
+    /// Returns true if this item matches the resource
+    #[inline]
+    pub fn is_type<T: Resource>(&self) -> bool {
+        std::any::TypeId::of::<T>() == self.type_id
+    }
+
     /// Observes access on the item
     pub fn observe(&mut self) -> ObservationEvent {
         let obvs = ObservationEvent::new();

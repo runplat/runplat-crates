@@ -11,6 +11,7 @@
 
 pub mod repr;
 pub use repr::repo;
+pub use repr::Repr;
 pub mod store;
 pub use store::Store;
 

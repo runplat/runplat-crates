@@ -1,30 +1,34 @@
-mod context;
-pub use context::Context;
-use runir::{repr::Repr, Resource};
+use runir::{Repr, Resource};
+use super::{Call, ThunkFn, Name, Plugin, Work};
+use crate::Result;
 
-use super::{AsyncContext, Namespace, Plugin};
-
-/// Type-alias for the call function of a plugin
-type CallFn = fn(Context) -> Option<AsyncContext>;
-
-/// Call by name primitive
+/// Attribute created by a plugin
 #[derive(Hash, Clone)]
 pub struct Thunk {
-    /// Namespace for this thunk
-    namespace: Namespace,
+    /// Name of the plugin that generated this thunk
+    name: Name,
     /// Call function
-    call: CallFn
+    call: ThunkFn
 }
 
 impl Thunk {
     /// Returns a new thunk from a plugin implementation
+    #[inline]
     pub fn new<P: Plugin>() -> Self {
-        Thunk { namespace: P::namespace(), call: P::call }
+        Thunk { name: P::name(), call: P::thunk }
     }
 
-    /// Returns the address representing this thunk
-    pub fn address(&self) -> &str {
-        ""
+    /// Returns the name of the plugin that created this thunk
+    #[inline]
+    pub fn name(&self) -> &Name {
+        &self.name
+    }
+
+    /// Executes the thunk
+    #[inline]
+    #[must_use = "If the future is not awaited, then the call cannot be executed"]
+    pub async fn exec(&self, call: Call) -> Result<Work> {
+        (self.call)(call)?.await?
     }
 }
 

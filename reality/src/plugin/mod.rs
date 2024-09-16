@@ -1,65 +1,59 @@
 mod thunk;
-pub use thunk::Context;
+mod name;
+mod state;
+mod work;
+mod call;
 pub use thunk::Thunk;
+pub use name::Name;
+pub use state::State;
+pub use work::Work;
+pub use call::Call;
+pub use call::Bind;
 
+use runir::Resource;
 use std::hash::Hash;
-use std::{future::Future, pin::pin};
-use runir::{repr::Repr, Resource};
-use tokio_util::sync::CancellationToken;
+use crate::Result;
 
-use crate::Error;
+/// Type-alias for a join handle that spawns plugin work
+pub type SpawnWork = tokio::task::JoinHandle<Result<Work>>;
+
+/// Type-alias for the a thunk function
+pub type ThunkFn = fn(Call) -> Result<SpawnWork>;
 
 /// Plugin trait for implementing extensions within the reality framework
-pub trait Plugin {
-    /// Namespace of this plugin
-    fn namespace() -> Namespace;
+pub trait Plugin: Resource + Hash + Sized {
+    /// Invoked when the thunk assigned to this plugin successfully binds a call to the plugin
+    fn call(bind: Bind<Self>) -> Result<SpawnWork>;
 
-    /// Invoked when activating the plugin
+    /// Invoked when the plugin is being called
+    ///
+    /// Returns an error if the call cannot be bound to this plugin, or if the underlying plugin call returns an error
+    fn thunk(call: Call) -> Result<SpawnWork> {
+        let bind = call.bind::<Self>()?;
+        Self::call(bind)
+    }
+
+    /// Name of this plugin
+    fn name() -> Name {
+        Name::new::<Self>()
+    }
+
+    /// Invoked when this plugin is loaded into state
     /// 
-    /// Returns an async context if the plugin should activate
-    fn call(context: Context) -> Option<AsyncContext>;
-
-    /// Invoked when this plugin is loaded into a context
-    fn load(put: runir::store::Put<'_, Self>) -> runir::store::Put<'_, Self>
-    where 
-        Self: Resource + Hash + Sized
-    {
-        put.attr(Thunk::new::<Self>())
+    /// Can be overridden to include additional attributes w/ this plugin
+    fn load(put: runir::store::Put<'_, Self>) -> runir::store::Put<'_, Self> {
+        put
     }
 }
 
-/// Struct containing name data
-#[derive(Hash, Clone, Default)]
-pub struct Namespace {
-    /// Root of this namespace
-    root: String,
-}
-
-impl Repr for Namespace {}
-impl Resource for Namespace {}
-
-pub struct AsyncContext {
-    task: tokio::task::JoinHandle<crate::Result<Context>>,
-    cancel: CancellationToken
-}
-
-impl Future for AsyncContext {
-    type Output = crate::Result<Context>;
-
-    fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
-        if self.cancel.is_cancelled() {
-            self.task.abort();
-            return std::task::Poll::Ready(Err(Error::PluginAborted));
-        }
-        let task = self.as_mut();
-        let pinned = pin!(task);
-        match pinned.poll(cx) {
-            std::task::Poll::Ready(r) => {
-                std::task::Poll::Ready(Ok(r?))
-            },
-            std::task::Poll::Pending => {
-                std::task::Poll::Pending
-            },
-        }
+/// Trait to centralize attributes that must be loaded with a plugin
+pub(crate) trait MustLoad : Plugin {
+    /// Invoked when this plugin is loaded into state
+    /// 
+    /// Loads critical attributes to this plugin, but can be overriden by the plugin
+    fn must_load(put: runir::store::Put<'_, Self>) -> runir::store::Put<'_, Self> {
+        put.attr(Thunk::new::<Self>()).attr(Self::name())
     }
 }
+
+impl<P: Plugin> MustLoad for P {}
