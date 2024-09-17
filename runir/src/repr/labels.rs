@@ -1,11 +1,10 @@
+use super::Repr;
+use crate::Resource;
+use serde::Serialize;
 use std::{collections::BTreeMap, ops::Deref};
 
-use crate::Resource;
-
-use super::Repr;
-
 /// Wrapper struct for a ordered label representation
-#[derive(Hash)]
+#[derive(Serialize)]
 pub struct Labels(pub BTreeMap<String, String>);
 
 impl Repr for Labels {}
@@ -49,6 +48,26 @@ mod tests {
             .attr(Labels::from(
                 &[("name", "random string"), ("media-type", "rust string")][..],
             ))
+            .commit();
+
+        assert!(handle.cast::<Attributes>().is_some());
+        let attributes = handle.cast::<Attributes>().unwrap();
+
+        let labels = attributes.get::<Labels>().unwrap();
+        assert_eq!("random string", labels.get("name").unwrap());
+        assert_eq!("rust string", labels.get("media-type").unwrap());
+    }
+
+    #[test]
+    fn test_labels_from_btree() {
+        let mut store = Store::new();
+        let mut labels = BTreeMap::new();
+        labels.insert("name".to_string(), "random string".to_string());
+        labels.insert("media-type".to_string(), "rust string".to_string());
+
+        let handle = store
+            .put(String::from("hello world"))
+            .attr(Labels::from(labels))
             .commit();
 
         assert!(handle.cast::<Attributes>().is_some());

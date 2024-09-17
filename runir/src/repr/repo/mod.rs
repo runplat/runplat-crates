@@ -53,10 +53,10 @@ impl Repo {
 
     /// Begins an assign operation for use with a `Store`
     ///
-    /// Assign will assign an attribute that implements Repr to a resource. Both must be hashable. The assignment is unique to the specific repr.
+    /// Assign will assign an attribute that implements Repr to a resource. Both must be serializable. The assignment is unique to the specific repr.
     #[inline]
     #[must_use = "When adding a representation for a resource, the output of this function must be used in conjunction with Store::put(..)"]
-    pub fn assign<'a: 'b, 'b, R: Repr + Hash, Rx: Resource + Hash>(
+    pub fn assign<'a: 'b, 'b, R: Repr + Serialize, Rx: Resource + Serialize>(
         &'a mut self,
         repr: R,
         resource: &'a Rx,

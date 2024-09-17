@@ -1,9 +1,10 @@
 use runir::*;
 use semver::Version;
+use serde::Serialize;
 use std::{fmt::Display, path::PathBuf};
 
 /// Struct containing name data
-#[derive(Hash, Clone)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Name {
     package: String,
     version: Version,

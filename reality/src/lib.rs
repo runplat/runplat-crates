@@ -10,22 +10,32 @@
 pub mod plugin;
 pub use plugin::Plugin;
 
+/// Re-export runir since it will be required for extending reality
+pub use runir;
+
 /// Type-alias for this crates main result type
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Enum of error variants produced by this library
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub enum Error {
-    JoinError { is_panic: bool, is_cancel: bool },
-    CouldNotFindPlugin,
+    /// Error when a join handle can not run to completion, analagous to tokio::runtime::JoinError
+    TaskError { is_panic: bool, is_cancel: bool },
+    /// Error returned when a plugin could not be loaded from a path
+    LoadPluginError,
+    /// Error when a plugin cannot be found in the current state
+    PluginNotFound,
+    /// Error returned when casting a dynamic pointer to a plugin
     PluginMismatch,
+    /// Error returned when a plugin call is cancelled
     PluginCallCancelled,
+    /// Error returned when a plugin call is skipped by the plugin
     PluginCallSkipped,
 }
 
 impl From<tokio::task::JoinError> for Error {
     fn from(e: tokio::task::JoinError) -> Self {
-        Self::JoinError {
+        Self::TaskError {
             is_panic: e.is_panic(),
             is_cancel: e.is_cancelled(),
         }
@@ -37,12 +47,74 @@ mod tests {
     use crate::*;
     use plugin::{Bind, Call, Plugin, State};
     use runir::Resource;
+    use serde::{Deserialize, Serialize};
     use std::{
         env,
         hash::Hash,
-        sync::{Arc, OnceLock}, time::Duration,
+        sync::{Arc, OnceLock},
+        time::Duration,
     };
     use tokio_util::sync::CancellationToken;
+
+    #[derive(Deserialize, Serialize, Hash)]
+    struct TomlPlugin {
+        name: String,
+    }
+
+    impl Plugin for TomlPlugin {
+        fn call(_: Bind<Self>) -> Result<plugin::SpawnWork> {
+            Err(Error::PluginCallSkipped)
+        }
+    }
+    impl Resource for TomlPlugin {}
+
+    #[tokio::test]
+    async fn test_plugin_load_toml() {
+        let mut state = State::new();
+
+        let toml = toml::to_string(&TomlPlugin {
+            name: String::from("hello world"),
+        });
+
+        state
+            .load_toml::<TomlPlugin>(&toml.expect("should be able to serialize"))
+            .expect("should be able to load");
+
+        let addr = state
+            .addresses()
+            .next()
+            .expect("should have loaded the plugin");
+        assert_eq!(
+            "reality/0.1.0/tests/tomlplugin/18a31368b3e2b8b3",
+            addr.to_string()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_plugin_replacement() {
+        let mut state = State::new();
+        state.register(TestPlugin {
+            skip: false,
+            called: Arc::new(OnceLock::new()),
+            call_mut: false,
+        });
+
+        state.register(TestPlugin {
+            skip: true,
+            called: Arc::new(OnceLock::new()),
+            call_mut: false,
+        });
+        let mut addresses = state.addresses();
+        assert_eq!(
+            "reality/0.1.0/tests/testplugin/920dbec49bc792e2",
+            addresses.next().expect("should have address").to_string()
+        );
+        assert_eq!(
+            "reality/0.1.0/tests/testplugin/d5e704c13717f385",
+            addresses.next().expect("should have address").to_string()
+        );
+        assert_eq!(2, state.addresses().count());
+    }
 
     #[tokio::test]
     async fn test_plugin_work_cancel() {
@@ -57,7 +129,10 @@ mod tests {
         let (f, cancel) = state.spawn(path.path()).expect("should spawn");
 
         cancel.cancel();
-        assert_eq!(Error::PluginCallCancelled, f.await.expect_err("should be cancelled"));
+        assert_eq!(
+            Error::PluginCallCancelled,
+            f.await.expect_err("should be cancelled")
+        );
     }
 
     #[tokio::test]
@@ -67,7 +142,7 @@ mod tests {
         let jh = handle.spawn(async {});
         jh.abort();
         assert_eq!(
-            Error::JoinError {
+            Error::TaskError {
                 is_panic: false,
                 is_cancel: true
             },
@@ -76,7 +151,7 @@ mod tests {
 
         let jh = handle.spawn(async { panic!() });
         assert_eq!(
-            Error::JoinError {
+            Error::TaskError {
                 is_panic: true,
                 is_cancel: false
             },
@@ -140,7 +215,7 @@ mod tests {
     async fn test_plugin_could_not_find_plugin() {
         let state = State::new();
         assert_eq!(
-            Error::CouldNotFindPlugin,
+            Error::PluginNotFound,
             state
                 .call("doesnt-exist")
                 .await
@@ -259,7 +334,7 @@ mod tests {
         State::new();
     }
 
-    #[derive(Clone, Hash, Debug)]
+    #[derive(Clone, Serialize, Debug)]
     struct NotTestPlugin;
 
     impl Resource for NotTestPlugin {}
@@ -269,9 +344,10 @@ mod tests {
         }
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, Serialize)]
     struct TestPlugin {
         skip: bool,
+        #[serde(skip)]
         called: Arc<OnceLock<bool>>,
         call_mut: bool,
     }
@@ -294,17 +370,15 @@ mod tests {
                 Ok(bind.work_mut(|test, _| {
                     let _ = test.called.set(true);
                     test.call_mut = false;
-                    async move { 
+                    async move {
                         tokio::time::sleep(Duration::from_secs(1)).await;
-                        Ok(()) 
+                        Ok(())
                     }
                 }))
             } else {
                 Ok(bind.work(|test, _| {
                     let _ = test.called.set(true);
-                    async move {
-                        Ok(()) 
-                    }
+                    async move { Ok(()) }
                 }))
             }
         }

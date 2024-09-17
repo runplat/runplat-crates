@@ -1,4 +1,4 @@
-use super::Plugin;
+use super::{Address, Name, Plugin};
 use crate::Error;
 use crate::{
     plugin::{Call, Thunk},
@@ -6,7 +6,9 @@ use crate::{
 };
 use runir::store::Item;
 use runir::{repo::Handle, repr::Attributes};
+use serde::de::DeserializeOwned;
 use std::future::Future;
+use std::ops::Deref;
 use std::pin::Pin;
 use std::{collections::BTreeMap, path::PathBuf};
 use tokio_util::sync::CancellationToken;
@@ -61,6 +63,17 @@ impl State {
         Self::new()
     }
 
+    /// Loads a plugin from toml
+    #[inline]
+    pub fn load_toml<P: Plugin + DeserializeOwned>(&mut self, toml: &str) -> std::io::Result<()> {
+        let plugin = toml::from_str::<P>(toml)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.message()))?;
+
+        self.register(plugin);
+
+        Ok(())
+    }
+
     /// Registers a plugin w/ the the current state
     #[inline]
     pub fn register<P: Plugin>(&mut self, plugin: P) -> &mut Self {
@@ -68,9 +81,11 @@ impl State {
         let name = P::name();
         let put = self.store.put(plugin);
         let handle = P::load(P::must_load(put)).commit();
-        if let Some(_) = self.plugins.insert(name.path().clone(), handle) {
-            // TODO: If a plugin was replaced, remove from the store
-        }
+        self.plugins.insert(name.path().clone(), handle.clone());
+        self.plugins.insert(
+            name.path().join(hex::encode(handle.commit().to_be_bytes())),
+            handle,
+        );
         self
     }
 
@@ -92,12 +107,9 @@ impl State {
     }
 
     /// Spawns the plugin
-    /// 
+    ///
     /// Returns the future and the associated cancellation token
-    pub fn spawn(
-        &self,
-        plugin: impl Into<PathBuf>,
-    ) -> Result<(BoxFuture, CancellationToken)> {
+    pub fn spawn(&self, plugin: impl Into<PathBuf>) -> Result<(BoxFuture, CancellationToken)> {
         let path = plugin.into();
         match self.plugins.get(&path).and_then(|h| {
             let id = h.commit();
@@ -121,10 +133,10 @@ impl State {
                         debug!(name = plugin_name, "Thunk binding complete, executing");
                         work.await
                     }),
-                    cancel
+                    cancel,
                 ))
             }
-            None => Err(Error::CouldNotFindPlugin),
+            None => Err(Error::PluginNotFound),
         }
     }
 
@@ -136,5 +148,24 @@ impl State {
             let id = h.commit();
             self.store.item(id)
         })
+    }
+
+    /// Returns each unique address stored in state
+    #[inline]
+    pub fn addresses(&self) -> impl Iterator<Item = Address> + '_ {
+        self.plugins
+            .iter()
+            .filter(|(p, _)| p.ancestors().count() > 5)
+            .filter_map(|(_, h)| {
+                let id = h.commit();
+                self.store
+                    .item(id)
+                    .and_then(|i| i.attributes().get::<Name>())
+                    .zip(Some(id))
+            })
+            .map(|(name, id)| Address {
+                name: name.deref().clone(),
+                commit: id,
+            })
     }
 }

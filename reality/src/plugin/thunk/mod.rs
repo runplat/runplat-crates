@@ -1,21 +1,26 @@
-use runir::{Repr, Resource};
-use super::{Call, ThunkFn, Name, Plugin, Work};
+use super::{Call, Name, Plugin, ThunkFn, Work};
 use crate::Result;
+use runir::{Repr, Resource};
+use serde::Serialize;
 
 /// Attribute created by a plugin
-#[derive(Hash, Clone)]
+#[derive(Serialize, Clone)]
 pub struct Thunk {
     /// Name of the plugin that generated this thunk
     name: Name,
     /// Call function
-    call: ThunkFn
+    #[serde(skip)]
+    call: ThunkFn,
 }
 
 impl Thunk {
     /// Returns a new thunk from a plugin implementation
     #[inline]
     pub fn new<P: Plugin>() -> Self {
-        Thunk { name: P::name(), call: P::thunk }
+        Thunk {
+            name: P::name(),
+            call: P::thunk,
+        }
     }
 
     /// Returns the name of the plugin that created this thunk

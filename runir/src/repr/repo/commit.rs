@@ -1,5 +1,4 @@
-use std::hash::Hash;
-
+use serde::Serialize;
 use uuid::Uuid;
 
 use super::*;
@@ -26,9 +25,9 @@ impl<'op, R: Repr> Commit<'op, R> {
     /// Hashes the current repr into the current commit uuid
     #[inline]
     #[must_use = "Must call `finish()` to complete the operation"]
-    pub fn hash_repr(mut self) -> Self
+    pub fn digest_repr(mut self) -> Self
     where
-        R: Hash,
+        R: Serialize,
     {
         let internals = self.repr.internals();
         let next_lo = internals.link_hash(&self.repr);
@@ -40,9 +39,9 @@ impl<'op, R: Repr> Commit<'op, R> {
     /// Hashes some state into the current commit uuid
     #[inline]
     #[must_use = "Must call `finish()` to complete the operation"]
-    pub fn hash(mut self, state: impl Hash) -> Self {
+    pub fn digest(mut self, state: impl Serialize) -> Self {
         let internals = self.repr.internals();
-        let next_lo = internals.link_hash(state);
+        let next_lo = internals.link_hash(&state);
         let (hi, lo) = self.commit.as_u64_pair();
         self.commit = Uuid::from_u64_pair(hi, lo ^ next_lo);
         self
@@ -134,7 +133,7 @@ mod tests {
         assert!(recalled.unwrap().cast::<TyRepr>().is_some());
     }
 
-    #[derive(Hash)]
+    #[derive(Serialize)]
     struct TestRepr {
         value: usize,
     }
@@ -145,8 +144,8 @@ mod tests {
     #[test]
     fn test_commit_hash_repr() {
         let mut repo = Repo::new();
-        let first = repo.commit(TestRepr { value: 0 }).hash_repr().finish();
-        let handle = repo.commit(TestRepr { value: 10 }).hash_repr().finish();
+        let first = repo.commit(TestRepr { value: 0 }).digest_repr().finish();
+        let handle = repo.commit(TestRepr { value: 10 }).digest_repr().finish();
         assert_ne!(first.commit(), handle.commit());
         assert!(handle.cast::<TestRepr>().is_some());
         let recalled = repo.checkout(handle.commit());
@@ -159,13 +158,13 @@ mod tests {
         let mut repo = Repo::new();
         let first = repo
             .commit(TestRepr { value: 0 })
-            .hash_repr()
-            .hash("test123")
+            .digest_repr()
+            .digest("test123")
             .finish();
         let handle = repo
             .commit(TestRepr { value: 0 })
-            .hash_repr()
-            .hash("1234test")
+            .digest_repr()
+            .digest("1234test")
             .finish();
         assert_ne!(first.commit(), handle.commit());
         assert!(handle.cast::<TestRepr>().is_some());

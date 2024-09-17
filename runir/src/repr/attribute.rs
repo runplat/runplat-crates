@@ -1,13 +1,14 @@
 use super::*;
 use repo::{Handle, Journal};
-use std::{collections::BTreeMap, fmt::Debug, hash::Hash, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc};
 
 /// Maps attribute typtes to their commit id in the journal
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Attributes {
     /// Map of associated attributes commits
     attrs: BTreeMap<u64, u64>,
     /// Journal for accessing attributes
+    #[serde(skip)]
     journal: Journal,
 }
 
@@ -42,20 +43,6 @@ impl Attributes {
             .hash_uuid::<Attribute>()
             .as_u64_pair();
         hi
-    }
-}
-
-impl Hash for Attributes {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.attrs.hash(state);
-    }
-}
-
-impl Debug for Attributes {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Attributes")
-            .field("attrs", &self.attrs)
-            .finish()
     }
 }
 

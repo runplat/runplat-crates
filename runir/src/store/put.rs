@@ -1,7 +1,6 @@
-use std::hash::Hash;
-
 use super::*;
 use crate::{repo::Handle, repr::Repr};
+use serde::Serialize;
 
 /// Constructs a "put" operation to the store
 pub struct Put<'put, R> {
@@ -15,10 +14,10 @@ pub struct Put<'put, R> {
     pub(crate) ident: Identifier<'put>,
 }
 
-impl<'put, R: Resource + Hash> Put<'put, R> {
+impl<'put, R: Resource + Serialize> Put<'put, R> {
     /// Adds an attribute for this resource
     #[inline]
-    pub fn attr<Attr: Repr + Hash>(mut self, attr: Attr) -> Self {
+    pub fn attr<Attr: Repr + Serialize>(mut self, attr: Attr) -> Self {
         let handle = self
             .store
             .repo
