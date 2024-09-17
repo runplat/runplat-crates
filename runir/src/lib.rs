@@ -12,6 +12,7 @@
 pub mod repr;
 pub use repr::repo;
 pub mod store;
+pub mod util;
 pub use repr::Repr;
 pub use store::Store;
 
