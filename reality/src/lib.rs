@@ -129,7 +129,7 @@ mod tests {
             .next()
             .expect("should have loaded the plugin");
         assert_eq!(
-            "reality/0.1.0/tests/tomlplugin/919e441aa8be6170",
+            "reality/0.1.0/tests/tomlplugin/f26cca0a864433c0",
             addr.to_string()
         );
     }
@@ -150,11 +150,11 @@ mod tests {
         });
         let mut addresses = state.addresses();
         assert_eq!(
-            "reality/0.1.0/tests/testplugin/29bc56a22ba9ce00",
+            "reality/0.1.0/tests/testplugin/941a6888b0b0b115",
             addresses.next().expect("should have address").to_string()
         );
         assert_eq!(
-            "reality/0.1.0/tests/testplugin/6e56eca78779af67",
+            "reality/0.1.0/tests/testplugin/a8e4ed11bd62ccdc",
             addresses.next().expect("should have address").to_string()
         );
         assert_eq!(2, state.addresses().count());
@@ -404,12 +404,6 @@ mod tests {
         #[serde(skip)]
         called: Arc<OnceLock<bool>>,
         call_mut: bool,
-    }
-
-    impl Hash for TestPlugin {
-        fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-            self.skip.hash(state);
-        }
     }
 
     impl Resource for TestPlugin {}

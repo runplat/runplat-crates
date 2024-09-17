@@ -42,7 +42,7 @@ impl Content for Thunk {
     fn state_uuid(&self) -> uuid::Uuid {
         let mut crc = runir::content::crc().digest();
         crc.update(self.name.full_plugin_ref().as_bytes());
-        crc.update(&(self.call as u64).to_be_bytes());
+        crc.update(stringify!(Thunk).as_bytes());
         uuid::Uuid::from_u64_pair(crc.finalize(), 0)
     }
 }

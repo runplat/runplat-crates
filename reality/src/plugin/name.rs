@@ -16,7 +16,7 @@ pub struct Name {
     pub(crate) module: String,
     pub(crate) plugin: String,
     pub(crate) path: PathBuf,
-    pub(crate) qualifiers: Vec<String>
+    pub(crate) qualifiers: Vec<String>,
 }
 
 impl Name {
@@ -44,26 +44,27 @@ impl Name {
 
         match package.zip(module).zip(plugin) {
             Some(((package, module), plugin)) => {
-                let path = PathBuf::from(&package).join(version.to_string()).join(&module).join(&plugin);
+                let path = PathBuf::from(&package)
+                    .join(version.to_string())
+                    .join(&module)
+                    .join(&plugin);
                 Name {
                     package,
                     version,
                     module,
                     plugin,
                     path,
-                    qualifiers
-                }
-            },
-            _ => {
-                Name {
-                    package: format!("unknown"),
-                    version,
-                    module: format!("unknown"),
-                    plugin: uuid::Uuid::new_v4().to_string(),
-                    path: PathBuf::new(),
-                    qualifiers
+                    qualifiers,
                 }
             }
+            _ => Name {
+                package: format!("unknown"),
+                version,
+                module: format!("unknown"),
+                plugin: uuid::Uuid::new_v4().to_string(),
+                path: PathBuf::new(),
+                qualifiers,
+            },
         }
     }
 
@@ -71,6 +72,10 @@ impl Name {
     #[inline]
     pub fn with_package(mut self, package: impl Into<String>) -> Self {
         self.package = package.into();
+        self.path = PathBuf::from(&self.package)
+            .join(self.version.to_string())
+            .join(&self.module)
+            .join(&self.plugin);
         self
     }
 
@@ -97,7 +102,7 @@ impl Name {
     }
 
     /// Returns name qualifiers for this plugin
-    /// 
+    ///
     /// Name qualifiers are the symbols between the plugins type name and package name
     #[inline]
     pub fn qualifiers(&self) -> impl Iterator<Item = &str> {
@@ -130,8 +135,8 @@ impl Content for Name {
 
 #[cfg(test)]
 mod tests {
-    use semver::Version;
     use super::Name;
+    use semver::Version;
 
     #[test]
     fn test_name_formatting() {
@@ -148,7 +153,10 @@ mod tests {
         assert_eq!("reality/string.string@0.1.0", format!("{name:#}"));
         assert_eq!("reality/0.1.0/string/string", name.path().to_string_lossy());
         assert_eq!("reality/string.string", name.plugin_ref().as_ref());
-        assert_eq!("reality/string.string@0.1.0", name.full_plugin_ref().as_ref());
+        assert_eq!(
+            "reality/string.string@0.1.0",
+            name.full_plugin_ref().as_ref()
+        );
         assert_eq!("reality/0.1.0/string/string", name.path().to_string_lossy());
     }
 }
