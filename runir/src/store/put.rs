@@ -15,6 +15,18 @@ pub struct Put<'put, R> {
 }
 
 impl<'put, R: Resource + Serialize> Put<'put, R> {
+    /// Returns a refernce to the resource being put into the srore
+    #[inline]
+    pub fn resource(&self) -> &R {
+        &self.resource
+    }
+
+    /// Returns a mutable reference to the resource being put into the store
+    #[inline]
+    pub fn resource_mut(&mut self) -> &mut R {
+        &mut self.resource
+    }
+
     /// Adds an attribute for this resource
     #[inline]
     pub fn attr<Attr: Repr + Serialize>(mut self, attr: Attr) -> Self {

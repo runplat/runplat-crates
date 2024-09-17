@@ -3,3 +3,4 @@
 //! Provides an engine built on top of the `reality` plugin framework
 
 pub mod engine;
+pub mod plugins;
