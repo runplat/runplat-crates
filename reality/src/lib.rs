@@ -15,6 +15,8 @@ pub use plugin::State;
 pub use runir;
 pub use runir::*;
 
+pub use semver::Version;
+
 /// Type-alias for this crates main result type
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -49,6 +51,7 @@ mod tests {
     use crate::*;
     use plugin::{Bind, Call, Plugin, State};
     use runir::Resource;
+    use semver::Version;
     use serde::{Deserialize, Serialize};
     use std::{
         env,
@@ -66,6 +69,10 @@ mod tests {
     impl Plugin for TomlPlugin {
         fn call(_: Bind<Self>) -> Result<plugin::SpawnWork> {
             Err(Error::PluginCallSkipped)
+        }
+        
+        fn version() -> semver::Version {
+            semver::Version::new(0, 1, 0)
         }
     }
     impl Resource for TomlPlugin {}
@@ -87,7 +94,7 @@ mod tests {
             .next()
             .expect("should have loaded the plugin");
         assert_eq!(
-            "reality/0.1.0/tests/tomlplugin/18a31368b3e2b8b3",
+            "reality/0.1.0/tests/tomlplugin/919e441aa8be6170",
             addr.to_string()
         );
     }
@@ -108,11 +115,11 @@ mod tests {
         });
         let mut addresses = state.addresses();
         assert_eq!(
-            "reality/0.1.0/tests/testplugin/920dbec49bc792e2",
+            "reality/0.1.0/tests/testplugin/29bc56a22ba9ce00",
             addresses.next().expect("should have address").to_string()
         );
         assert_eq!(
-            "reality/0.1.0/tests/testplugin/d5e704c13717f385",
+            "reality/0.1.0/tests/testplugin/6e56eca78779af67",
             addresses.next().expect("should have address").to_string()
         );
         assert_eq!(2, state.addresses().count());
@@ -344,6 +351,10 @@ mod tests {
         fn call(_: Bind<Self>) -> Result<plugin::SpawnWork> {
             todo!()
         }
+        
+        fn version() -> semver::Version {
+            Version::new(0, 1, 0)
+        }
     }
 
     #[derive(Clone, Serialize)]
@@ -383,6 +394,10 @@ mod tests {
                     async move { Ok(()) }
                 }))
             }
+        }
+        
+        fn version() -> Version {
+            Version::new(0, 1, 0)
         }
     }
 }

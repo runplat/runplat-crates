@@ -5,13 +5,13 @@ mod name;
 mod state;
 mod thunk;
 mod work;
-use std::path::PathBuf;
 
 pub use address::Address;
 pub use call::Bind;
 pub use call::Call;
 pub use event::Event;
 pub use name::Name;
+use semver::Version;
 use serde::Serialize;
 pub use state::State;
 pub use thunk::Thunk;
@@ -31,6 +31,11 @@ pub trait Plugin: Resource + Serialize + Sized {
     /// Invoked when the thunk assigned to this plugin successfully binds a call to the plugin
     fn call(bind: Bind<Self>) -> Result<SpawnWork>;
 
+    /// Plugin version
+    /// 
+    /// **Recommendation**: Implementation should just use `env!("CARGO_PKG_VERSION")` to avoid confusion
+    fn version() -> Version;
+
     /// Invoked when the plugin is being called
     ///
     /// Returns an error if the call cannot be bound to this plugin, or if the underlying plugin call returns an error
@@ -43,17 +48,12 @@ pub trait Plugin: Resource + Serialize + Sized {
     /// Name of this plugin
     #[inline]
     fn name() -> Name {
-        let (name, version) = Self::package();
-        Name::new::<Self>(name, &version)
+        Name::new::<Self>(Self::version())
     }
 
-    /// Package tuple
-    /// 
-    /// ## Note 
-    /// Will be the reality package name and version unless this is overridden
-    // `(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))`
+    /// Version of the framework
     #[inline]
-    fn package() -> (&'static str, &'static str) {
+    fn framework() -> (&'static str, &'static str) {
         (env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
     }
 

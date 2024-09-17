@@ -11,6 +11,7 @@ pub struct Name {
     pub(crate) module: String,
     pub(crate) plugin: String,
     pub(crate) path: PathBuf,
+    pub(crate) qualifiers: Vec<String>
 }
 
 impl Name {
@@ -20,47 +21,44 @@ impl Name {
     ///
     /// The format of the path is `{package-name}/{package-version}/{upper-most-module}/{type-name}`
     #[inline]
-    pub fn new<T>(pkg_name: &str, pkg_version: &str) -> Name
+    pub fn new<T>(version: semver::Version) -> Name
     where
         T: ?Sized,
     {
-        let mut name = Name {
-            package: pkg_name.to_lowercase(),
-            version: pkg_version
-                .parse::<semver::Version>()
-                .expect("should be a valid semver because cargo will not let you compile if the this value is not a valid version"),
-                // NOTE: In case the above invariant is no-longer true, this is how to handle the error
-                // .unwrap_or_else(|_| {
-                //     let mut version = semver::Version::new(0, 0, 0);
-                //     version.pre =
-                //         Prerelease::new("unknown").expect("should be a valid pre-release tag");
-                //     version
-                // }),
-            module: String::from("unknown"),
-            plugin: uuid::Uuid::new_v4().to_string().to_lowercase(),
-            path: PathBuf::new(),
-        };
-
         let mut fq_ty_name = std::any::type_name::<T>()
             .split("::")
-            .map(|p| p.to_lowercase())
-            .skip(1); // The first component is the package name
-        match fq_ty_name
-            .next()
-            .zip(fq_ty_name.last().map(|l| l.to_lowercase()))
-        {
-            Some((module, plugin)) => {
-                name.module = module;
-                name.plugin = plugin;
-            }
-            None => {}
-        }
+            .map(|p| p.to_lowercase());
 
-        name.path = PathBuf::from(&name.package)
-            .join(name.version.to_string())
-            .join(&name.module)
-            .join(&name.plugin);
-        name
+        let package = fq_ty_name.next();
+        let module = fq_ty_name.next();
+        let mut rest = fq_ty_name.collect::<Vec<_>>();
+        let plugin = rest.pop();
+
+        let qualifiers = rest;
+
+        match package.zip(module).zip(plugin) {
+            Some(((package, module), plugin)) => {
+                let path = PathBuf::from(&package).join(version.to_string()).join(&module).join(&plugin);
+                Name {
+                    package,
+                    version,
+                    module,
+                    plugin,
+                    path,
+                    qualifiers
+                }
+            },
+            _ => {
+                Name {
+                    package: format!("unknown"),
+                    version,
+                    module: format!("unknown"),
+                    plugin: uuid::Uuid::new_v4().to_string(),
+                    path: PathBuf::new(),
+                    qualifiers
+                }
+            }
+        }
     }
 
     /// Returns this name in a path format
@@ -105,16 +103,18 @@ impl Resource for Name {}
 
 #[cfg(test)]
 mod tests {
+    use semver::Version;
+
     use super::Name;
 
     #[test]
     fn test_name_formatting() {
-        let name = Name::new::<String>("reality", "string");
-        assert_eq!("reality/string.string", name.to_string().as_str());
-        assert_eq!("reality/string.string@0.1.0", format!("{name:#}"));
-        assert_eq!("reality/0.1.0/string/string", name.path().to_string_lossy());
-        assert_eq!("reality/string.string", name.plugin_ref());
-        assert_eq!("reality/string.string@0.1.0", name.full_plugin_ref());
-        assert_eq!("reality/0.1.0/string/string", name.path().to_string_lossy());
+        let name = Name::new::<String>(Version::new(0, 1, 0));
+        assert_eq!("alloc/string.string", name.to_string().as_str());
+        assert_eq!("alloc/string.string@0.1.0", format!("{name:#}"));
+        assert_eq!("alloc/0.1.0/string/string", name.path().to_string_lossy());
+        assert_eq!("alloc/string.string", name.plugin_ref());
+        assert_eq!("alloc/string.string@0.1.0", name.full_plugin_ref());
+        assert_eq!("alloc/0.1.0/string/string", name.path().to_string_lossy());
     }
 }

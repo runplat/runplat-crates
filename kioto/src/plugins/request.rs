@@ -1,4 +1,4 @@
-use reality::{Resource, Plugin};
+use reality::{Plugin, Resource, Version};
 use serde::Serialize;
 use url::Url;
 
@@ -13,8 +13,8 @@ impl Plugin for Request {
         todo!()
     }
 
-    fn package() -> (&'static str, &'static str) {
-        (env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
+    fn version() -> Version {
+        env!("CARGO_PKG_VERSION").parse().expect("should be a version because cargo will complain first")
     }
 }
 
