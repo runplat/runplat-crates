@@ -8,6 +8,7 @@
 //! The framework is built on top of the tokio runtime system, and an effort is made to make all components thread-safe by default.
 
 pub mod plugin;
+use plugin::Name;
 pub use plugin::Plugin;
 pub use plugin::State;
 
@@ -23,7 +24,7 @@ pub use uuid::Uuid;
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Enum of error variants produced by this library
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Error {
     /// Error when a join handle can not run to completion, analagous to tokio::runtime::JoinError
     TaskError { is_panic: bool, is_cancel: bool },
@@ -37,6 +38,11 @@ pub enum Error {
     PluginCallCancelled,
     /// Error returned when a plugin call is skipped by the plugin
     PluginCallSkipped,
+    PluginCallError {
+        /// Name of the plugin where the error occured
+        name: Name,
+        message: String,
+    }
 }
 
 impl From<tokio::task::JoinError> for Error {

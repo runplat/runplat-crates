@@ -85,6 +85,28 @@ impl<P: Plugin> Bind<P> {
         &self.call.item
     }
 
+    /// Defers access to the item for later by executing with the binding instead
+    #[inline]
+    pub fn defer<F>(
+        self,
+        exec: impl FnOnce(Bind<P>, CancellationToken) -> F + Send + 'static,
+    ) -> Result<tokio::task::JoinHandle<Result<Work>>>
+    where
+        F: Future<Output = Result<()>> + Send + 'static,
+    {
+        let handle = self.call.handle.clone();
+        let cancel = self.call.cancel.clone();
+        let binding = self.clone();
+
+        // Technically should not block
+        Ok(handle.clone().spawn_blocking(move || {
+            Ok(Work {
+                task: handle.spawn(exec(binding, cancel.clone())),
+                cancel,
+            })
+        }))
+    }
+
     /// Consumes the call context and spawns returns work w/ mutable access to the plugin,
     ///
     /// Returns a join handle which will return work representing the running background task
@@ -131,6 +153,21 @@ impl<P: Plugin> Bind<P> {
                 cancel,
             })
         })
+    }
+
+    /// Convenience helper for calling returns `Err(Error::PluginCallSkipped)`
+    #[inline]
+    pub fn skip(self) -> crate::Result<crate::plugin::SpawnWork> {
+        Err(Error::PluginCallSkipped)
+    }
+
+    /// Convenience helper for constructing a plugin error
+    #[inline]
+    pub fn plugin_call_error(&self, message: impl Into<String>) -> crate::Error {
+        crate::Error::PluginCallError {
+            name: P::name(),
+            message: message.into(),
+        }
     }
 }
 

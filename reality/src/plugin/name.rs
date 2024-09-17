@@ -11,7 +11,7 @@ use super::Plugin;
 pub type PluginRef<'a> = Cow<'a, str>;
 
 /// Struct containing name data
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, PartialEq, PartialOrd)]
 pub struct Name {
     pub(crate) package: String,
     pub(crate) version: Version,

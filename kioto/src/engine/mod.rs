@@ -24,4 +24,16 @@ impl Engine {
         self.events.push(event);
         Ok(())
     }
+
+    /// Returns an event pushed on to this engine
+    #[inline]
+    pub fn event(&self, index: usize) -> Option<&Event> {
+        self.events.get(index)
+    }
+
+    /// Returns a reference to the engine's state
+    #[inline]
+    pub fn state(&self) -> &State {
+        &self.state
+    }
 }
