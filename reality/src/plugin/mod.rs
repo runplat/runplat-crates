@@ -48,7 +48,7 @@ pub trait Plugin: Resource + Content + Sized {
     /// Name of this plugin
     #[inline]
     fn name() -> Name {
-        Name::new::<Self>(Self::version())
+        Name::new::<Self>()
     }
 
     /// Version of the framework

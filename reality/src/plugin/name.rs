@@ -5,6 +5,8 @@ use std::{borrow::Cow, fmt::Display, path::PathBuf};
 
 use crate::BincodeContent;
 
+use super::Plugin;
+
 /// Type-alias for a Plugin reference string
 pub type PluginRef<'a> = Cow<'a, str>;
 
@@ -17,6 +19,7 @@ pub struct Name {
     pub(crate) plugin: String,
     pub(crate) path: PathBuf,
     pub(crate) qualifiers: Vec<String>,
+    pub(crate) framework: (&'static str, &'static str),
 }
 
 impl Name {
@@ -26,11 +29,11 @@ impl Name {
     ///
     /// The format of the path is `{package-name}/{package-version}/{upper-most-module}/{type-name}`
     #[inline]
-    pub fn new<T>(version: impl Into<semver::Version>) -> Name
+    pub fn new<T>() -> Name
     where
-        T: ?Sized,
+        T: Plugin + ?Sized,
     {
-        let version = version.into();
+        let version = T::version();
         let mut fq_ty_name = std::any::type_name::<T>()
             .split("::")
             .map(|p| p.to_lowercase());
@@ -55,6 +58,7 @@ impl Name {
                     plugin,
                     path,
                     qualifiers,
+                    framework: T::framework(),
                 }
             }
             _ => Name {
@@ -64,19 +68,9 @@ impl Name {
                 plugin: uuid::Uuid::new_v4().to_string(),
                 path: PathBuf::new(),
                 qualifiers,
+                framework: T::framework(),
             },
         }
-    }
-
-    /// Returns the name w/ a different package
-    #[inline]
-    pub fn with_package(mut self, package: impl Into<String>) -> Self {
-        self.package = package.into();
-        self.path = PathBuf::from(&self.package)
-            .join(self.version.to_string())
-            .join(&self.module)
-            .join(&self.plugin);
-        self
     }
 
     /// Returns this name in a path format
@@ -135,28 +129,39 @@ impl Content for Name {
 
 #[cfg(test)]
 mod tests {
+    use crate::Plugin;
+
     use super::Name;
+    use runir::{Content, Repr, Resource};
     use semver::Version;
+    use uuid::Uuid;
+    
+    struct Test;
+    impl Resource for Test {}
+    impl Repr for Test {}
+    impl Content for Test {
+        fn state_uuid(&self) -> uuid::Uuid {
+            Uuid::nil()
+        }
+    }
+    impl Plugin for Test {
+        fn call(_: crate::plugin::Bind<Self>) -> crate::Result<crate::plugin::SpawnWork> {
+            todo!()
+        }
+    
+        fn version() -> Version {
+            Version::new(0, 0, 0)
+        }
+    }
 
     #[test]
     fn test_name_formatting() {
-        let name = Name::new::<String>(Version::new(0, 1, 0));
-        assert_eq!("alloc/string.string", name.to_string().as_str());
-        assert_eq!("alloc/string.string@0.1.0", format!("{name:#}"));
-        assert_eq!("alloc/0.1.0/string/string", name.path().to_string_lossy());
-        assert_eq!("alloc/string.string", name.plugin_ref().as_ref());
-        assert_eq!("alloc/string.string@0.1.0", name.full_plugin_ref().as_ref());
-        assert_eq!("alloc/0.1.0/string/string", name.path().to_string_lossy());
-
-        let name = name.with_package("reality");
-        assert_eq!("reality/string.string", name.to_string().as_str());
-        assert_eq!("reality/string.string@0.1.0", format!("{name:#}"));
-        assert_eq!("reality/0.1.0/string/string", name.path().to_string_lossy());
-        assert_eq!("reality/string.string", name.plugin_ref().as_ref());
-        assert_eq!(
-            "reality/string.string@0.1.0",
-            name.full_plugin_ref().as_ref()
-        );
-        assert_eq!("reality/0.1.0/string/string", name.path().to_string_lossy());
+        let name = Name::new::<Test>();
+        assert_eq!("reality/plugin.test", name.to_string().as_str());
+        assert_eq!("reality/plugin.test@0.0.0", format!("{name:#}"));
+        assert_eq!("reality/0.0.0/plugin/test", name.path().to_string_lossy());
+        assert_eq!("reality/plugin.test", name.plugin_ref().as_ref());
+        assert_eq!("reality/plugin.test@0.0.0", name.full_plugin_ref().as_ref());
+        assert_eq!("reality/0.0.0/plugin/test", name.path().to_string_lossy());
     }
 }
