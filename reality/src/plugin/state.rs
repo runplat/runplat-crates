@@ -1,9 +1,11 @@
 use super::{Address, Name, Plugin};
+use crate::plugin::event::Event;
 use crate::Error;
 use crate::{
     plugin::{Call, Thunk},
     Result,
 };
+use clap::ArgMatches;
 use runir::store::Item;
 use runir::{repo::Handle, repr::Attributes};
 use serde::de::DeserializeOwned;
@@ -63,6 +65,20 @@ impl State {
         Self::new()
     }
 
+    /// Registers a plugin from parsing cli arg matches
+    #[inline]
+    pub fn parse_args<P: Plugin + clap::FromArgMatches>(
+        &mut self,
+        matches: &ArgMatches,
+    ) -> std::io::Result<()> {
+        let plugin = P::from_arg_matches(matches)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()))?;
+
+        self.register(plugin);
+
+        Ok(())
+    }
+
     /// Loads and registers a plugin from toml
     #[inline]
     pub fn load_toml<P: Plugin + DeserializeOwned>(&mut self, toml: &str) -> std::io::Result<()> {
@@ -104,18 +120,36 @@ impl State {
         f.await
     }
 
-    /// Spawns the plugin
+    /// Spawns a call to a plugin
     ///
     /// Returns the future and the associated cancellation token
+    #[inline]
     pub fn spawn(&self, plugin: impl Into<PathBuf>) -> Result<(BoxFuture, CancellationToken)> {
+        let event = self.event(plugin)?;
+        let (f, cancel) = event.fork();
+        Ok((Box::pin(f.start()), cancel))
+    }
+
+    /// Creates a new "Event" for a plugin
+    pub fn event(&self, plugin: impl Into<PathBuf>) -> Result<Event> {
         let path = plugin.into();
         match self.plugins.get(&path).and_then(|h| {
             let id = h.commit();
             self.store
                 .item(id)
                 .zip(h.cast::<Attributes>().and_then(|a| a.get::<Thunk>()))
+                .map(|(i, t)| {
+                    (
+                        Address {
+                            name: t.name().clone(),
+                            commit: id,
+                        },
+                        i,
+                        t,
+                    )
+                })
         }) {
-            Some((item, thunk)) => {
+            Some((address, item, thunk)) => {
                 let plugin_name = thunk.name().to_string();
                 debug!(name = plugin_name, "Preparing thunk");
                 let cancel = self.cancel.child_token();
@@ -125,14 +159,11 @@ impl State {
                     handle: self.handle.clone(),
                 };
 
-                Ok((
-                    Box::pin(async move {
-                        let work = thunk.exec(call).await?;
-                        debug!(name = plugin_name, "Thunk binding complete, executing");
-                        work.await
-                    }),
-                    cancel,
-                ))
+                Ok(Event {
+                    address,
+                    call,
+                    thunk: thunk.as_ref().clone(),
+                })
             }
             None => Err(Error::PluginNotFound),
         }

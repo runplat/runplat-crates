@@ -39,6 +39,16 @@ impl Call {
             Err(Error::PluginMismatch)
         }
     }
+
+    /// Creates a fork of this call
+    #[inline]
+    pub fn fork(&self) -> Call {
+        Call {
+            item: self.item.clone(),
+            cancel: self.cancel.child_token(),
+            handle: self.handle.clone(),
+        }
+    }
 }
 
 pub struct Bind<P: Plugin> {

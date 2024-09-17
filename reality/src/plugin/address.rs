@@ -3,9 +3,11 @@ use serde::Serialize;
 use super::Name;
 
 /// Full address to a plugin which includes both the name and the commit the plugin is stored at
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Address {
+    /// Plugin name this address points to
     pub(crate) name: Name,
+    /// Commit id the plugin registered as
     pub(crate) commit: u64,
 }
 

@@ -1,5 +1,6 @@
 mod address;
 mod call;
+mod event;
 mod name;
 mod state;
 mod thunk;
@@ -7,6 +8,7 @@ mod work;
 pub use address::Address;
 pub use call::Bind;
 pub use call::Call;
+pub use event::Event;
 pub use name::Name;
 use serde::Serialize;
 pub use state::State;
@@ -30,12 +32,14 @@ pub trait Plugin: Resource + Serialize + Sized {
     /// Invoked when the plugin is being called
     ///
     /// Returns an error if the call cannot be bound to this plugin, or if the underlying plugin call returns an error
+    #[inline]
     fn thunk(call: Call) -> Result<SpawnWork> {
         let bind = call.bind::<Self>()?;
         Self::call(bind)
     }
 
     /// Name of this plugin
+    #[inline]
     fn name() -> Name {
         Name::new::<Self>()
     }
@@ -43,6 +47,7 @@ pub trait Plugin: Resource + Serialize + Sized {
     /// Invoked when this plugin is loaded into state
     ///
     /// Can be overridden to include additional attributes w/ this plugin
+    #[inline]
     fn load(put: runir::store::Put<'_, Self>) -> runir::store::Put<'_, Self> {
         put
     }
@@ -53,6 +58,7 @@ pub(crate) trait MustLoad: Plugin {
     /// Invoked when this plugin is loaded into state
     ///
     /// Loads critical attributes to this plugin, but can be overriden by the plugin
+    #[inline]
     fn must_load(put: runir::store::Put<'_, Self>) -> runir::store::Put<'_, Self> {
         put.attr(Thunk::new::<Self>()).attr(Self::name())
     }

@@ -1,16 +1,27 @@
-mod event;
-pub use event::Event;
+use std::path::PathBuf;
+use reality::plugin::Event;
+use reality::State;
 
-/// An engine manages access and configuring a state instance
+/// An engine manages a collection of events and plugin resources
 pub struct Engine {
     /// Engine state which stores plugin resources
-    state: reality::State,
+    state: State,
+    /// Collection of events created by this engine
+    events: Vec<Event>
 }
 
 impl Engine {
     /// Creates an engine with state
     #[inline]
     pub fn with(state: reality::State) -> Self {
-        Engine { state }
+        Engine { state, events: vec![] }
+    }
+
+    /// Pushes a plugin event onto the engine
+    #[inline]
+    pub fn push(&mut self, plugin: impl Into<PathBuf>) -> reality::Result<()> {
+        let event = self.state.event(plugin)?;
+        self.events.push(event);
+        Ok(())
     }
 }
