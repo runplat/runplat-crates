@@ -1,7 +1,10 @@
 use runir::*;
 use semver::Version;
 use serde::Serialize;
-use std::{fmt::Display, path::PathBuf};
+use std::{borrow::Cow, fmt::Display, path::PathBuf};
+
+/// Type-alias for a Plugin reference string
+pub type PluginRef<'a> = Cow<'a, str>;
 
 /// Struct containing name data
 #[derive(Debug, Serialize, Clone)]
@@ -21,10 +24,11 @@ impl Name {
     ///
     /// The format of the path is `{package-name}/{package-version}/{upper-most-module}/{type-name}`
     #[inline]
-    pub fn new<T>(version: semver::Version) -> Name
+    pub fn new<T>(version: impl Into<semver::Version>) -> Name
     where
         T: ?Sized,
     {
+        let version = version.into();
         let mut fq_ty_name = std::any::type_name::<T>()
             .split("::")
             .map(|p| p.to_lowercase());
@@ -61,6 +65,13 @@ impl Name {
         }
     }
 
+    /// Returns the name w/ a different package
+    #[inline]
+    pub fn with_package(mut self, package: impl Into<String>) -> Self {
+        self.package = package.into();
+        self
+    }
+
     /// Returns this name in a path format
     #[inline]
     pub fn path(&self) -> &PathBuf {
@@ -71,16 +82,16 @@ impl Name {
     ///
     /// **Note**: This is the "alternate" display format of `Name::to_string`
     #[inline]
-    pub fn full_plugin_ref(&self) -> String {
-        format!("{self:#}")
+    pub fn full_plugin_ref(&self) -> PluginRef {
+        Cow::Owned(format!("{self:#}"))
     }
 
     /// Returns the short plugin reference format which does not include the version
     ///
     /// **Note**: This is the default display format of `Name::to_string`
     #[inline]
-    pub fn plugin_ref(&self) -> String {
-        format!("{self}")
+    pub fn plugin_ref(&self) -> PluginRef {
+        Cow::Owned(format!("{self}"))
     }
 }
 
@@ -104,7 +115,6 @@ impl Resource for Name {}
 #[cfg(test)]
 mod tests {
     use semver::Version;
-
     use super::Name;
 
     #[test]
@@ -113,8 +123,8 @@ mod tests {
         assert_eq!("alloc/string.string", name.to_string().as_str());
         assert_eq!("alloc/string.string@0.1.0", format!("{name:#}"));
         assert_eq!("alloc/0.1.0/string/string", name.path().to_string_lossy());
-        assert_eq!("alloc/string.string", name.plugin_ref());
-        assert_eq!("alloc/string.string@0.1.0", name.full_plugin_ref());
+        assert_eq!("alloc/string.string", name.plugin_ref().as_ref());
+        assert_eq!("alloc/string.string@0.1.0", name.full_plugin_ref().as_ref());
         assert_eq!("alloc/0.1.0/string/string", name.path().to_string_lossy());
     }
 }
