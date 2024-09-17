@@ -1,6 +1,5 @@
 use super::*;
-use crate::{repo::Handle, repr::Repr};
-use serde::Serialize;
+use crate::{repo::Handle, repr::Repr, Content};
 
 /// Constructs a "put" operation to the store
 pub struct Put<'put, R> {
@@ -14,7 +13,7 @@ pub struct Put<'put, R> {
     pub(crate) ident: Identifier<'put>,
 }
 
-impl<'put, R: Resource + Serialize> Put<'put, R> {
+impl<'put, R: Resource + Content> Put<'put, R> {
     /// Returns a refernce to the resource being put into the srore
     #[inline]
     pub fn resource(&self) -> &R {
@@ -29,7 +28,7 @@ impl<'put, R: Resource + Serialize> Put<'put, R> {
 
     /// Adds an attribute for this resource
     #[inline]
-    pub fn attr<Attr: Repr + Serialize>(mut self, attr: Attr) -> Self {
+    pub fn attr<Attr: Repr + Content>(mut self, attr: Attr) -> Self {
         let handle = self
             .store
             .repo

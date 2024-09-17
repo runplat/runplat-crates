@@ -1,4 +1,4 @@
-use reality::{Plugin, Resource, Version};
+use reality::{BincodeContent, Content, Plugin, Resource, Uuid, Version};
 use serde::Serialize;
 use url::Url;
 
@@ -19,6 +19,12 @@ impl Plugin for Request {
 }
 
 impl Resource for Request {}
+
+impl Content for Request {
+    fn state_uuid(&self) -> Uuid {
+        BincodeContent::new(self).unwrap().state_uuid()
+    }
+}
 
 #[cfg(test)]
 mod tests {

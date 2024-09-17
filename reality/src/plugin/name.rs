@@ -3,6 +3,8 @@ use semver::Version;
 use serde::Serialize;
 use std::{borrow::Cow, fmt::Display, path::PathBuf};
 
+use crate::BincodeContent;
+
 /// Type-alias for a Plugin reference string
 pub type PluginRef<'a> = Cow<'a, str>;
 
@@ -93,6 +95,14 @@ impl Name {
     pub fn plugin_ref(&self) -> PluginRef {
         Cow::Owned(format!("{self}"))
     }
+
+    /// Returns name qualifiers for this plugin
+    /// 
+    /// Name qualifiers are the symbols between the plugins type name and package name
+    #[inline]
+    pub fn qualifiers(&self) -> impl Iterator<Item = &str> {
+        self.qualifiers.iter().map(|q| q.as_str())
+    }
 }
 
 impl Display for Name {
@@ -112,6 +122,12 @@ impl Display for Name {
 impl Repr for Name {}
 impl Resource for Name {}
 
+impl Content for Name {
+    fn state_uuid(&self) -> uuid::Uuid {
+        BincodeContent::new(self).unwrap().state_uuid()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use semver::Version;
@@ -126,5 +142,13 @@ mod tests {
         assert_eq!("alloc/string.string", name.plugin_ref().as_ref());
         assert_eq!("alloc/string.string@0.1.0", name.full_plugin_ref().as_ref());
         assert_eq!("alloc/0.1.0/string/string", name.path().to_string_lossy());
+
+        let name = name.with_package("reality");
+        assert_eq!("reality/string.string", name.to_string().as_str());
+        assert_eq!("reality/string.string@0.1.0", format!("{name:#}"));
+        assert_eq!("reality/0.1.0/string/string", name.path().to_string_lossy());
+        assert_eq!("reality/string.string", name.plugin_ref().as_ref());
+        assert_eq!("reality/string.string@0.1.0", name.full_plugin_ref().as_ref());
+        assert_eq!("reality/0.1.0/string/string", name.path().to_string_lossy());
     }
 }

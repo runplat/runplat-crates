@@ -1,10 +1,8 @@
 use super::Repr;
-use crate::Resource;
-use serde::Serialize;
+use crate::{Content, Resource};
 use std::{collections::BTreeMap, ops::Deref};
 
 /// Wrapper struct for a ordered label representation
-#[derive(Serialize)]
 pub struct Labels(pub BTreeMap<String, String>);
 
 impl Repr for Labels {}
@@ -31,6 +29,17 @@ impl Deref for Labels {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl Content for Labels {
+    fn state_uuid(&self) -> uuid::Uuid {
+        let mut crc = crate::content::crc().digest();
+        for (k, v) in self.0.iter() {
+            crc.update(k.as_bytes());
+            crc.update(v.as_bytes());
+        }
+        uuid::Uuid::from_u64_pair(crc.finalize(), 0)
     }
 }
 

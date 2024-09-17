@@ -16,6 +16,8 @@ pub use runir;
 pub use runir::*;
 
 pub use semver::Version;
+use serde::Serialize;
+pub use uuid::Uuid;
 
 /// Type-alias for this crates main result type
 pub type Result<T> = std::result::Result<T, Error>;
@@ -46,6 +48,33 @@ impl From<tokio::task::JoinError> for Error {
     }
 }
 
+pub struct BincodeContent {
+    state_uuid: Uuid,
+}
+
+impl BincodeContent {
+    /// Creates a new Bincode Content
+    pub fn new<S: Serialize>(c: &S) -> std::io::Result<Self> {
+        match bincode::serialize(c) {
+            Ok(b) => {
+                let mut crc = crate::content::crc().digest();
+                crc.update(&b);
+                Ok(Self { state_uuid: uuid::Uuid::from_u64_pair(crc.finalize(), 0) })
+            }
+            Err(e) => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                e.to_string(),
+            )),
+        }
+    }
+}
+
+impl runir::Content for BincodeContent {
+    fn state_uuid(&self) -> uuid::Uuid {
+        self.state_uuid.clone()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::*;
@@ -66,11 +95,17 @@ mod tests {
         name: String,
     }
 
+    impl Content for TomlPlugin {
+        fn state_uuid(&self) -> uuid::Uuid {
+            BincodeContent::new(self).unwrap().state_uuid()
+        }
+    }
+
     impl Plugin for TomlPlugin {
         fn call(_: Bind<Self>) -> Result<plugin::SpawnWork> {
             Err(Error::PluginCallSkipped)
         }
-        
+
         fn version() -> semver::Version {
             semver::Version::new(0, 1, 0)
         }
@@ -351,9 +386,15 @@ mod tests {
         fn call(_: Bind<Self>) -> Result<plugin::SpawnWork> {
             todo!()
         }
-        
+
         fn version() -> semver::Version {
             Version::new(0, 1, 0)
+        }
+    }
+
+    impl Content for NotTestPlugin {
+        fn state_uuid(&self) -> uuid::Uuid {
+            BincodeContent::new(self).unwrap().state_uuid()
         }
     }
 
@@ -395,9 +436,15 @@ mod tests {
                 }))
             }
         }
-        
+
         fn version() -> Version {
             Version::new(0, 1, 0)
+        }
+    }
+
+    impl Content for TestPlugin {
+        fn state_uuid(&self) -> uuid::Uuid {
+            BincodeContent::new(self).unwrap().state_uuid()
         }
     }
 }

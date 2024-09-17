@@ -2,16 +2,15 @@ mod attribute;
 mod labels;
 pub mod repo;
 mod ty;
-use crate::Resource;
+use crate::{Content, Resource};
 pub use attribute::Attributes;
 pub use labels::Labels;
 pub use repo::Repo;
-use serde::Serialize;
 use std::{any::TypeId, borrow::Cow, fmt::Debug, pin::Pin, sync::Arc};
 pub use ty::TyRepr;
 
 /// Enumeration of identifier variants
-#[derive(Clone, Serialize)]
+#[derive(Clone)]
 pub enum Identifier<'a> {
     Unit,
     Str(Cow<'a, str>),
@@ -39,7 +38,7 @@ pub trait ReprInternals: Sized + Repr {
     /// Returns a "link" value of a representation instance given an identifier
     ///
     /// **Note**: Since this is a hash function, it must return the same value for the same identifier
-    fn link_hash_str(&self, identifier: &str) -> u64;
+    fn link_hash_str_id(&self, identifier: &str) -> u64;
 
     /// Returns a "link" value of a representation instance given an identifier
     ///
@@ -49,7 +48,7 @@ pub trait ReprInternals: Sized + Repr {
     /// Returns a "link" value of a representation instance after "hashing" an identifier
     ///
     /// **Note**: Since this is a hash function, it must return the same value for the same identifier
-    fn link_hash<S: Serialize>(&self, serializeable: &S) -> u64;
+    fn link_hash_content<C: Content + ?Sized>(&self, content: &C) -> u64;
 
     /// Returns a uuid that can be used for hashing
     fn hash_uuid<T>(&self) -> uuid::Uuid

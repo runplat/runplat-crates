@@ -358,6 +358,7 @@ dependencies = [
 name = "reality"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "clap",
  "hex",
  "runir",
@@ -419,9 +420,7 @@ checksum = "7a66a03ae7c801facd77a29370b4faec201768915ac14a721ba36f20bc9c209b"
 name = "runir"
 version = "0.1.0"
 dependencies = [
- "bincode",
  "crc",
- "serde",
  "uuid",
 ]
 

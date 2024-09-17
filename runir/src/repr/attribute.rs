@@ -3,12 +3,11 @@ use repo::{Handle, Journal};
 use std::{collections::BTreeMap, sync::Arc};
 
 /// Maps attribute typtes to their commit id in the journal
-#[derive(Clone, Serialize)]
+#[derive(Clone)]
 pub struct Attributes {
     /// Map of associated attributes commits
     attrs: BTreeMap<u64, u64>,
     /// Journal for accessing attributes
-    #[serde(skip)]
     journal: Journal,
 }
 
@@ -48,3 +47,14 @@ impl Attributes {
 
 impl Resource for Attributes {}
 impl Repr for Attributes {}
+
+impl Content for Attributes {
+    fn state_uuid(&self) -> uuid::Uuid {
+        let mut crc = crate::content::crc().digest();
+        for (k, v) in self.attrs.iter() {
+            crc.update(&k.to_be_bytes());
+            crc.update(&v.to_be_bytes());
+        }
+        uuid::Uuid::from_u64_pair(crc.finalize(), 0)
+    }
+}

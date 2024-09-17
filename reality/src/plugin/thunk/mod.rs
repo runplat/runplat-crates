@@ -1,15 +1,13 @@
 use super::{Call, Name, Plugin, ThunkFn, Work};
 use crate::Result;
-use runir::{Repr, Resource};
-use serde::Serialize;
+use runir::{Content, Repr, Resource};
 
 /// Attribute created by a plugin
-#[derive(Serialize, Clone)]
+#[derive(Clone)]
 pub struct Thunk {
     /// Name of the plugin that generated this thunk
     name: Name,
     /// Call function
-    #[serde(skip)]
     call: ThunkFn,
 }
 
@@ -39,3 +37,12 @@ impl Thunk {
 
 impl Repr for Thunk {}
 impl Resource for Thunk {}
+
+impl Content for Thunk {
+    fn state_uuid(&self) -> uuid::Uuid {
+        let mut crc = runir::content::crc().digest();
+        crc.update(self.name.full_plugin_ref().as_bytes());
+        crc.update(&(self.call as u64).to_be_bytes());
+        uuid::Uuid::from_u64_pair(crc.finalize(), 0)
+    }
+}

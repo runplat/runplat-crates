@@ -11,8 +11,8 @@ pub use call::Bind;
 pub use call::Call;
 pub use event::Event;
 pub use name::Name;
+use runir::Content;
 use semver::Version;
-use serde::Serialize;
 pub use state::State;
 pub use thunk::Thunk;
 pub use work::Work;
@@ -27,7 +27,7 @@ pub type SpawnWork = tokio::task::JoinHandle<Result<Work>>;
 pub type ThunkFn = fn(Call) -> Result<SpawnWork>;
 
 /// Plugin trait for implementing extensions within the reality framework
-pub trait Plugin: Resource + Serialize + Sized {
+pub trait Plugin: Resource + Content + Sized {
     /// Invoked when the thunk assigned to this plugin successfully binds a call to the plugin
     fn call(bind: Bind<Self>) -> Result<SpawnWork>;
 
