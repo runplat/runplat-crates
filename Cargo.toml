@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
-members = [ "kioto",
+members = [ 
+    "kioto",
     "reality",
     "runir"
 ]

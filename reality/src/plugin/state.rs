@@ -63,14 +63,12 @@ impl State {
         Self::new()
     }
 
-    /// Loads a plugin from toml
+    /// Loads and registers a plugin from toml
     #[inline]
     pub fn load_toml<P: Plugin + DeserializeOwned>(&mut self, toml: &str) -> std::io::Result<()> {
         let plugin = toml::from_str::<P>(toml)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.message()))?;
-
         self.register(plugin);
-
         Ok(())
     }
 

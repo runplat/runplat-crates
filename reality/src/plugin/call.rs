@@ -69,6 +69,12 @@ impl<P: Plugin> Bind<P> {
         }
     }
 
+    /// Returns the item bound to this call
+    #[inline]
+    pub fn item(&self) -> &Item {
+        &self.call.item
+    }
+
     /// Consumes the call context and spawns returns work w/ mutable access to the plugin,
     ///
     /// Returns a join handle which will return work representing the running background task

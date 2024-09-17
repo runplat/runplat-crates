@@ -9,6 +9,7 @@
 
 pub mod plugin;
 pub use plugin::Plugin;
+pub use plugin::State;
 
 /// Re-export runir since it will be required for extending reality
 pub use runir;

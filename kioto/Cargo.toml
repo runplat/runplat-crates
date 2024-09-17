@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+reality ={ path = "../reality"}
 serde = "1.0.210"
 tokio = "1.40.0"

@@ -138,6 +138,7 @@ dependencies = [
 name = "kioto"
 version = "0.1.0"
 dependencies = [
+ "reality",
  "serde",
  "tokio",
 ]
