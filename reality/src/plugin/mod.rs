@@ -5,6 +5,8 @@ mod name;
 mod state;
 mod thunk;
 mod work;
+use std::path::PathBuf;
+
 pub use address::Address;
 pub use call::Bind;
 pub use call::Call;
@@ -41,7 +43,18 @@ pub trait Plugin: Resource + Serialize + Sized {
     /// Name of this plugin
     #[inline]
     fn name() -> Name {
-        Name::new::<Self>()
+        let (name, version) = Self::package();
+        Name::new::<Self>(name, &version)
+    }
+
+    /// Package tuple
+    /// 
+    /// ## Note 
+    /// Will be the reality package name and version unless this is overridden
+    // `(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))`
+    #[inline]
+    fn package() -> (&'static str, &'static str) {
+        (env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
     }
 
     /// Invoked when this plugin is loaded into state

@@ -11,8 +11,8 @@
 
 pub mod repr;
 pub use repr::repo;
-pub use repr::Repr;
 pub mod store;
+pub use repr::Repr;
 pub use store::Store;
 
 /// Trait representing a dynamic resource which can be stored and retrieved

@@ -6,11 +6,11 @@ use std::{fmt::Display, path::PathBuf};
 /// Struct containing name data
 #[derive(Debug, Serialize, Clone)]
 pub struct Name {
-    package: String,
-    version: Version,
-    module: String,
-    plugin: String,
-    path: PathBuf,
+    pub(crate) package: String,
+    pub(crate) version: Version,
+    pub(crate) module: String,
+    pub(crate) plugin: String,
+    pub(crate) path: PathBuf,
 }
 
 impl Name {
@@ -20,13 +20,13 @@ impl Name {
     ///
     /// The format of the path is `{package-name}/{package-version}/{upper-most-module}/{type-name}`
     #[inline]
-    pub fn new<T>() -> Name
+    pub fn new<T>(pkg_name: &str, pkg_version: &str) -> Name
     where
         T: ?Sized,
     {
         let mut name = Name {
-            package: env!("CARGO_PKG_NAME").to_lowercase(),
-            version: env!("CARGO_PKG_VERSION")
+            package: pkg_name.to_lowercase(),
+            version: pkg_version
                 .parse::<semver::Version>()
                 .expect("should be a valid semver because cargo will not let you compile if the this value is not a valid version"),
                 // NOTE: In case the above invariant is no-longer true, this is how to handle the error
@@ -109,7 +109,7 @@ mod tests {
 
     #[test]
     fn test_name_formatting() {
-        let name = Name::new::<String>();
+        let name = Name::new::<String>("reality", "string");
         assert_eq!("reality/string.string", name.to_string().as_str());
         assert_eq!("reality/string.string@0.1.0", format!("{name:#}"));
         assert_eq!("reality/0.1.0/string/string", name.path().to_string_lossy());

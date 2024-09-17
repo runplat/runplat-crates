@@ -13,6 +13,7 @@ pub use plugin::State;
 
 /// Re-export runir since it will be required for extending reality
 pub use runir;
+pub use runir::*;
 
 /// Type-alias for this crates main result type
 pub type Result<T> = std::result::Result<T, Error>;
