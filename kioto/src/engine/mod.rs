@@ -17,7 +17,7 @@ impl Engine {
         Engine { state, events: vec![] }
     }
 
-    /// Pushes a plugin event onto the engine
+    /// Creates and pushes a plugin event onto the engine
     #[inline]
     pub fn push(&mut self, plugin: impl Into<PathBuf>) -> reality::Result<()> {
         let event = self.state.event(plugin)?;
