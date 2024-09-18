@@ -1,4 +1,5 @@
 use tokio_util::sync::CancellationToken;
+use tracing::debug;
 
 use super::{Address, Call, Thunk};
 use crate::Result;
@@ -41,6 +42,7 @@ impl Event {
     /// Consumes and starts the event
     #[inline]
     pub async fn start(self) -> Result<()> {
+        debug!(address = self.address().to_string(), "event_start");
         let work = self.thunk.exec(self.call).await?;
         work.await
     }

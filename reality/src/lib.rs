@@ -8,7 +8,6 @@
 //! The framework is built on top of the tokio runtime system, and an effort is made to make all components thread-safe by default.
 
 pub mod plugin;
-use plugin::Name;
 pub use plugin::Plugin;
 pub use plugin::State;
 
@@ -16,9 +15,13 @@ pub use plugin::State;
 pub use runir;
 pub use runir::*;
 
+/// Re-export common types
 pub use semver::Version;
-use serde::Serialize;
+pub use uuid;
 pub use uuid::Uuid;
+
+use plugin::Name;
+use serde::Serialize;
 
 /// Type-alias for this crates main result type
 pub type Result<T> = std::result::Result<T, Error>;

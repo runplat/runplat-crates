@@ -14,3 +14,4 @@ hyper-util = { version = "0.1.8", features = ["client", "http1", "http2", "tokio
 http-body-util = "0.1.2"
 tracing = "0.1.40"
 bytes = "1.7.1"
+clap = { version = "4.5.17", features = ["derive"] }

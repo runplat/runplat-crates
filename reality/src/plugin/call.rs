@@ -51,8 +51,15 @@ impl Call {
     }
 }
 
+/// Represents the binding between a plugin and it's associated Call
+/// 
+/// Main entrypoint for all plugins when they are invoked
 pub struct Bind<P: Plugin> {
+    /// Call this binding is associated to
+    /// 
+    /// Before a binding is created, the association is verified
     pub(crate) call: Call,
+    /// Type this binding is bound to
     pub(crate) _bound: PhantomData<P>,
 }
 
@@ -168,6 +175,12 @@ impl<P: Plugin> Bind<P> {
             name: P::name(),
             message: message.into(),
         }
+    }
+
+    /// Convenience helper for returning a plugin call cancelled error
+    #[inline]
+    pub fn plugin_call_cancelled(&self) -> crate::Error {
+        crate::Error::PluginCallCancelled
     }
 }
 
