@@ -31,12 +31,22 @@ pub struct Delimitted<const DELIM: char, T: FromStr + Send + Sync + 'static> {
 
 /// Struct to define an iterater over a list of strings w/ a character DELIM
 #[derive(Debug)]
-pub struct DelimittedStr<const DELIM: char> {
+pub struct DelimittedStr<const DELIM: char, const COUNT: usize = 0> {
     /// Source of the list
     value: String,
     /// Current iterator position
     cursor: AtomicUsize,
 }
+
+/// Struct to define an iterater over a list of strings w/ a character DELIM1DELIM2
+#[derive(Debug)]
+pub struct DelimittedStr2<const DELIM1: char, const DELIM2: char, const COUNT: usize = 0> {
+    /// Source of the list
+    value: String,
+    /// Current iterator position
+    cursor: AtomicUsize,
+}
+
 
 impl KeyValuePairs {
     /// Returns an iterator of key value pairs
@@ -52,11 +62,11 @@ impl KeyValuePairs {
 /// Scans for headers from a string and returns an iterator over the results
 #[inline]
 pub fn scan_for_headers(source: &str) -> impl Iterator<Item = (&str, Vec<&str>)> {
-    let headers = source.parse::<DelimittedStr<';'>>().unwrap();
+    let headers = source.parse::<DelimittedStr2<';', ';'>>().unwrap();
 
     let items = headers
         .map(|h| {
-            let pair = DelimittedStr::<'='>::from_str(&h).unwrap();
+            let pair = DelimittedStr::<'=', 2>::from_str(&h).unwrap();
             let key = (&pair).next().unwrap();
             let mut values = vec![];
             for v in &pair {
@@ -84,6 +94,7 @@ pub fn scan_for_headers(source: &str) -> impl Iterator<Item = (&str, Vec<&str>)>
             vals.push(val);
         }
 
+        *cursor += 1;
         (key, vals)
     })
 }
@@ -206,18 +217,18 @@ impl<const DELIM: char, T: FromStr + Send + Sync + 'static> Iterator for Delimit
     }
 }
 
-impl<const DELIM: char> FromStr for DelimittedStr<DELIM> {
+impl<const DELIM: char, const COUNT: usize> FromStr for DelimittedStr<DELIM, COUNT> {
     type Err = Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(DelimittedStr {
-            value: s.replace(' ', ""),
+            value: s.to_string(),
             cursor: AtomicUsize::new(0),
         })
     }
 }
 
-impl<const DELIM: char> DelimittedStr<DELIM> {
+impl<const DELIM: char, const COUNT: usize> DelimittedStr<DELIM, COUNT> {
     /// Returns the next value
     fn increment_counter(&self) {
         self.cursor
@@ -226,20 +237,86 @@ impl<const DELIM: char> DelimittedStr<DELIM> {
 
     /// Returns the current value
     fn value<'a: 'b, 'b>(&'a self) -> std::option::Option<Cow<'b, str>> {
-        self.value
-            .split(DELIM)
-            .nth(self.cursor.load(std::sync::atomic::Ordering::Relaxed))
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(Cow::Borrowed)
+        if COUNT == 0 {
+            self.value
+                .split(DELIM)
+                .nth(self.cursor.load(std::sync::atomic::Ordering::Relaxed))
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(Cow::Borrowed)
+        } else {
+            self.value
+                .splitn(COUNT, DELIM)
+                .nth(self.cursor.load(std::sync::atomic::Ordering::Relaxed))
+                // .next()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(Cow::Borrowed)
+        }
     }
 }
 
-impl<'a, const DELIM: char> Iterator for &'a DelimittedStr<DELIM> {
+impl<'a, const DELIM: char, const COUNT: usize> Iterator for &'a DelimittedStr<DELIM, COUNT> {
     type Item = Cow<'a, str>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if !self.value.contains(DELIM) {
+            return None;
+        }
+        let out = self.value();
+        self.increment_counter();
+
+        if out.is_none() {
+            self.cursor.store(0, std::sync::atomic::Ordering::Relaxed)
+        }
+        out
+    }
+}
+
+
+impl<const DELIM1: char, const DELIM2: char, const COUNT: usize> FromStr for DelimittedStr2<DELIM1, DELIM2, COUNT> {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(DelimittedStr2 {
+            value: s.to_string(),
+            cursor: AtomicUsize::new(0),
+        })
+    }
+}
+
+impl<const DELIM1: char, const DELIM2: char, const COUNT: usize> DelimittedStr2<DELIM1, DELIM2, COUNT> {
+    /// Returns the next value
+    fn increment_counter(&self) {
+        self.cursor
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Returns the current value
+    fn value<'a: 'b, 'b>(&'a self) -> std::option::Option<Cow<'b, str>> {
+        if COUNT == 0 {
+            self.value
+                .split(&format!("{DELIM1}{DELIM2}"))
+                .nth(self.cursor.load(std::sync::atomic::Ordering::Relaxed))
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(Cow::Borrowed)
+        } else {
+            self.value
+                .splitn(COUNT, &format!("{DELIM1}{DELIM2}"))
+                .nth(self.cursor.load(std::sync::atomic::Ordering::Relaxed))
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(Cow::Borrowed)
+        }
+    }
+}
+
+impl<'a, const DELIM1: char, const DELIM2: char, const COUNT: usize> Iterator for &'a DelimittedStr2<DELIM1, DELIM2, COUNT> {
+    type Item = Cow<'a, str>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if !self.value.contains(&format!("{DELIM1}{DELIM2}")) {
             return None;
         }
         let out = self.value();

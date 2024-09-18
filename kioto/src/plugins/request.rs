@@ -1,7 +1,9 @@
 use bytes::{Bytes, BytesMut};
 use clap::Args;
 use http_body_util::combinators::BoxBody;
-use hyper::{body::Incoming, header, Response};
+use hyper::{
+    body::Incoming, header, Response
+};
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use reality::{plugin::Bind, BincodeContent, Content, Plugin, Resource, Uuid, Version};
 use serde::{Deserialize, Serialize};
@@ -189,7 +191,7 @@ pub struct Request {
     /// URL to send the request to
     url: Url,
     /// If true, will use http2 when making the request
-    #[serde(rename = "http2")]
+    #[serde(rename = "http2", default)]
     use_http2: bool,
     /// File path to use as the body
     file: Option<PathBuf>,
@@ -328,9 +330,9 @@ impl Request {
     /// Parse and set the headers for the request
     #[inline]
     fn set_headers(&self, mut builder: RequestBuilder) -> RequestBuilder {
-        let headers = self.headers.join(";");
+        let headers = self.headers.join(";;");
         for (header, v) in reality::runir::util::scan_for_headers(&headers) {
-            builder = builder.header(header, v.join(","));
+            builder = builder.header(header.to_lowercase(), v.join(","));
         }
         builder
     }
@@ -570,6 +572,7 @@ mod tests {
     use std::ffi::OsString;
 
     use clap::{CommandFactory, Parser, Subcommand};
+    use http_body_util::BodyExt;
     use reality::State;
 
     use crate::engine::Engine;
@@ -642,6 +645,51 @@ http2 = false
             .expect("should return resp");
         assert!(resp.status().is_success());
         eprintln!("{:#?}", resp);
+        ()
+    }
+
+    #[tokio::test]
+    async fn test_request_plugin_call_from_engine_post_with_json() {
+        let mut state = State::new();
+        state
+            .load_toml::<Request>(
+                r#"
+url = "https://jsonplaceholder.typicode.com/posts"
+method = "POST"
+json = """
+{
+  "title": "foo",
+  "body": "bar",
+  "userId": 1
+}
+"""
+headers = [
+  "x-ms-CORRELATION-ID=test"
+]
+"#,
+            )
+            .expect("should be able to load request");
+
+        let mut engine = Engine::with(state);
+        engine
+            .push("kioto/0.1.0/plugins/request")
+            .expect("should be able to push an event");
+        let event = engine.event(0).expect("should have this event");
+
+        let (event, _) = event.fork();
+        event.start().await.expect("should work");
+
+        let mut resp = engine
+            .state()
+            .find_plugin("kioto/0.1.0/plugins/request")
+            .map(|i| i.clone())
+            .and_then(|mut i| i.borrow_mut::<Request>().and_then(|r| r.response.take()))
+            .expect("should return resp");
+        let incoming = resp.body_mut();
+        let collected = incoming.collect().await.unwrap();
+        eprintln!("{:#?}", collected);
+        eprintln!("{}", String::from_utf8_lossy(&collected.to_bytes()));
+        assert!(resp.status().is_success());
         ()
     }
 
@@ -789,8 +837,9 @@ http2 = false
             "testparser",
             "test",
             "--patch",
-            "-H 'Accept=application/json'",
+            "-H 'Accept=application/json; charset=UTF-8'",
             "-H 'Accept=application/json2'",
+            "-H 'x-ms-Custom=test'",
             "https://jsonplaceholder.typicode.com/posts",
         ]);
         assert_eq!(
@@ -800,7 +849,14 @@ http2 = false
         assert!(!req.use_http2);
         assert!(req.file.is_none());
         assert!(req.json.is_none());
-        assert_eq!(["Accept=application/json", "Accept=application/json2"], &req.headers[..]);
+        assert_eq!(
+            [
+                "Accept=application/json; charset=UTF-8",
+                "Accept=application/json2",
+                "x-ms-Custom=test"
+            ],
+            &req.headers[..]
+        );
         assert!(req.response.is_none());
         assert_eq!("PATCH", req.method.clone().unwrap());
         ()
