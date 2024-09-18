@@ -491,6 +491,7 @@ dependencies = [
  "shlex",
  "tokio",
  "tokio-native-tls",
+ "toml",
  "toml_edit",
  "tracing",
  "url",

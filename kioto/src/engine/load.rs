@@ -36,6 +36,21 @@ pub enum LoadInput {
 }
 
 impl<P: Plugin> Load<P> {
+    /// Loads a plugin from input
+    #[inline]
+    pub fn load<'load>(&'load self, state: &mut State, input: impl Into<LoadInput>) -> std::io::Result<Address> {
+        let input = input.into();
+        match (&self.load, input) {
+            (LoadBy::Toml(load_toml), LoadInput::Toml(input_toml)) => {
+                load_toml(state, &input_toml)
+            },
+            (LoadBy::Args(load_args), LoadInput::Args(input_args)) => {
+                load_args(state, &input_args)
+            },
+            _ => Err(Error::new(std::io::ErrorKind::InvalidInput, "Could not load input with provided input settings"))
+        }
+    }
+    
     /// Creates a load resource for a plugin to load by cli arg matches
     #[inline]
     pub fn by_args() -> Self 
@@ -58,21 +73,6 @@ impl<P: Plugin> Load<P> {
     #[inline]
     pub fn name(&self) -> &Name {
         &self.name
-    }
-
-    /// Loads a plugin from input
-    #[inline]
-    pub fn load<'load>(&'load self, state: &mut State, input: impl Into<LoadInput>) -> std::io::Result<Address> {
-        let input = input.into();
-        match (&self.load, input) {
-            (LoadBy::Toml(load_toml), LoadInput::Toml(input_toml)) => {
-                load_toml(state, &input_toml)
-            },
-            (LoadBy::Args(load_args), LoadInput::Args(input_args)) => {
-                load_args(state, &input_args)
-            },
-            _ => Err(Error::new(std::io::ErrorKind::InvalidInput, "Could not load input with provided input settings"))
-        }
     }
 }
 

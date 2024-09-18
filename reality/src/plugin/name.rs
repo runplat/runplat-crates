@@ -1,7 +1,7 @@
 use runir::*;
 use semver::Version;
 use serde::Serialize;
-use std::{borrow::Cow, fmt::Display, path::PathBuf};
+use std::{borrow::Cow, collections::BTreeSet, fmt::Display, path::PathBuf};
 
 use crate::BincodeContent;
 
@@ -20,6 +20,7 @@ pub struct Name {
     pub(crate) path: PathBuf,
     pub(crate) qualifiers: Vec<String>,
     pub(crate) framework: (&'static str, &'static str),
+    pub(crate) matchers: BTreeSet<String>,
 }
 
 impl Name {
@@ -42,9 +43,7 @@ impl Name {
         let module = fq_ty_name.next();
         let mut rest = fq_ty_name.collect::<Vec<_>>();
         let plugin = rest.pop();
-
         let qualifiers = rest;
-
         match package.zip(module).zip(plugin) {
             Some(((package, module), plugin)) => {
                 let path = PathBuf::from(&package)
@@ -59,7 +58,9 @@ impl Name {
                     path,
                     qualifiers,
                     framework: T::framework(),
+                    matchers: BTreeSet::new(),
                 }
+                .init_matchers()
             }
             _ => Name {
                 package: format!("unknown"),
@@ -69,7 +70,9 @@ impl Name {
                 path: PathBuf::new(),
                 qualifiers,
                 framework: T::framework(),
-            },
+                matchers: BTreeSet::new(),
+            }
+            .init_matchers(),
         }
     }
 
@@ -101,6 +104,16 @@ impl Name {
     #[inline]
     pub fn qualifiers(&self) -> impl Iterator<Item = &str> {
         self.qualifiers.iter().map(|q| q.as_str())
+    }
+
+    /// Initializes matchers for this name
+    #[inline]
+    fn init_matchers(mut self) -> Self {
+        self.matchers.insert(self.plugin_ref().to_string());
+        self.matchers.insert(self.full_plugin_ref().to_string());
+        self.matchers
+            .insert(self.path().to_string_lossy().to_string());
+        self
     }
 }
 
@@ -135,7 +148,7 @@ mod tests {
     use runir::{Content, Repr, Resource};
     use semver::Version;
     use uuid::Uuid;
-    
+
     struct Test;
     impl Resource for Test {}
     impl Repr for Test {}
@@ -148,7 +161,7 @@ mod tests {
         fn call(_: crate::plugin::Bind<Self>) -> crate::Result<crate::plugin::SpawnWork> {
             todo!()
         }
-    
+
         fn version() -> Version {
             Version::new(0, 0, 0)
         }

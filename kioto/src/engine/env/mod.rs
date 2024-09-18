@@ -1,7 +1,8 @@
+mod config;
+pub use config::EngineConfig;
+
 use reality::{Content, Repr, Resource, State, Uuid};
-
 use crate::plugins::{Request, RequestArgs};
-
 use super::Load;
 
 /// Type-alias for a function that creates an environment
@@ -11,6 +12,8 @@ type CreateEnv = fn() -> State;
 pub struct Env {
     /// Label for this environment
     label: String,
+    /// Engine config for this environment
+    config: Option<EngineConfig>,
     /// Function for creating a new environment
     create_env: CreateEnv,
 }
@@ -21,8 +24,15 @@ impl Env {
     pub fn new(label: impl Into<String>, create_env: fn() -> State) -> Self {
         Self {
             label: label.into(),
+            config: None,
             create_env,
         }
+    }
+
+    /// Sets the config for the environment
+    #[inline]
+    pub fn with_config(&mut self, config: EngineConfig) {
+        self.config = Some(config);
     }
 
     /// Creates a new state
@@ -46,6 +56,7 @@ impl Default for Env {
     fn default() -> Self {
         Self {
             label: String::from("default"),
+            config: None,
             create_env: default_env,
         }
     }
