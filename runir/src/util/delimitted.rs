@@ -371,7 +371,7 @@ fn test_delimitted_complex() {
 
 #[test]
 fn test_delimitted_str() {
-    let mut results = scan_for_headers("Accept=text;Names=test,abc;");
+    let mut results = scan_for_headers("Accept=text;;Names=test,abc;;");
     assert_eq!(("Accept", vec!["text"]), results.next().unwrap());
     assert_eq!(("Names", vec!["test", "abc"]), results.next().unwrap());
 }

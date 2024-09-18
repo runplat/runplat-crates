@@ -200,6 +200,7 @@ pub struct Request {
     /// HTTP method to execute
     method: Option<String>,
     /// Header parameters
+    #[serde(default)]
     headers: Vec<String>,
     /// Response this request received
     #[serde(skip)]

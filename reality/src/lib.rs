@@ -147,7 +147,7 @@ mod tests {
             .next()
             .expect("should have loaded the plugin");
         assert_eq!(
-            "reality/0.1.0/tests/tomlplugin/f26cca0a864433c0",
+            "reality/0.1.0/tests/tomlplugin/7edda5a7ede17df7",
             addr.to_string()
         );
     }
@@ -168,11 +168,11 @@ mod tests {
         });
         let mut addresses = state.addresses();
         assert_eq!(
-            "reality/0.1.0/tests/testplugin/941a6888b0b0b115",
+            "reality/0.1.0/tests/testplugin/089a6a41e900cd54",
             addresses.next().expect("should have address").to_string()
         );
         assert_eq!(
-            "reality/0.1.0/tests/testplugin/a8e4ed11bd62ccdc",
+            "reality/0.1.0/tests/testplugin/3464efd8e4d2b09d",
             addresses.next().expect("should have address").to_string()
         );
         assert_eq!(2, state.addresses().count());
