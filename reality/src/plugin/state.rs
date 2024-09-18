@@ -21,11 +21,12 @@ use tracing::debug;
 type BoxFuture = Pin<Box<dyn Future<Output = Result<()>>>>;
 
 /// State contains manages registering and calling plugins
+#[derive(Clone)]
 pub struct State {
     /// Store for resources owned by this state
     store: runir::Store,
     /// Cancellation token to stop any work related to this state
-    cancel: CancellationToken,
+    pub(crate) cancel: CancellationToken,
     /// Handle to runtime to create work from state
     handle: tokio::runtime::Handle,
     /// Map of registered plugins
@@ -171,7 +172,9 @@ impl State {
                 debug!(name = plugin_name, "Preparing thunk");
                 let cancel = self.cancel.child_token();
                 let call = Call {
+                    state: self.clone(),
                     item: item.clone(),
+                    fork_fn: thunk.fork_fn(),
                     cancel: cancel.clone(),
                     handle: self.handle.clone(),
                 };
@@ -180,6 +183,7 @@ impl State {
                     address,
                     call,
                     thunk: thunk.as_ref().clone(),
+                    handler: None
                 })
             }
             None => Err(Error::PluginNotFound),

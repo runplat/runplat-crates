@@ -37,15 +37,22 @@ pub enum Error {
     PluginNotFound,
     /// Error returned when casting a dynamic pointer to a plugin
     PluginMismatch,
+    /// Error returned when the trying to add a handler to a plugin event
+    /// and the the handler's target does not match the type of backing the
+    /// event
+    PluginHandlerTargetMismatch,
+    /// Error returned when a plugin handlercall is skipped by the plugin
+    PluginHandlerCallSkipped,
     /// Error returned when a plugin call is cancelled
     PluginCallCancelled,
     /// Error returned when a plugin call is skipped by the plugin
     PluginCallSkipped,
+    /// Custom error returned by the implementation of the plugin
     PluginCallError {
         /// Name of the plugin where the error occured
         name: Name,
         message: String,
-    }
+    },
 }
 
 impl From<tokio::task::JoinError> for Error {
@@ -68,7 +75,9 @@ impl BincodeContent {
             Ok(b) => {
                 let mut crc = crate::content::crc().digest();
                 crc.update(&b);
-                Ok(Self { state_uuid: uuid::Uuid::from_u64_pair(crc.finalize(), 0) })
+                Ok(Self {
+                    state_uuid: uuid::Uuid::from_u64_pair(crc.finalize(), 0),
+                })
             }
             Err(e) => Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
@@ -87,7 +96,7 @@ impl runir::Content for BincodeContent {
 #[cfg(test)]
 mod tests {
     use crate::*;
-    use plugin::{Bind, Call, Plugin, State};
+    use plugin::{Bind, Call, Handler, Plugin, State};
     use runir::Resource;
     use semver::Version;
     use serde::{Deserialize, Serialize};
@@ -223,7 +232,9 @@ mod tests {
 
         let plugin = state.find_plugin(TestPlugin::name().path()).unwrap();
         let call = Call {
+            state: state.clone(),
             item: plugin.clone(),
+            fork_fn: TestPlugin::fork,
             cancel: CancellationToken::new(),
             handle: tokio::runtime::Handle::current(),
         };
@@ -236,7 +247,9 @@ mod tests {
 
         // Tests internal error handling
         let call = Call {
+            state: state.clone(),
             item: plugin.clone(),
+            fork_fn: TestPlugin::fork,
             cancel: CancellationToken::new(),
             handle: tokio::runtime::Handle::current(),
         };
@@ -246,7 +259,9 @@ mod tests {
 
         // Tests internal error handling
         let call = Call {
+            state: state.clone(),
             item: plugin.clone(),
+            fork_fn: TestPlugin::fork,
             cancel: CancellationToken::new(),
             handle: tokio::runtime::Handle::current(),
         };
@@ -381,6 +396,27 @@ mod tests {
         assert!(called.get().unwrap());
     }
 
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_state_with_event_handler() {
+        let called = Arc::new(OnceLock::new());
+        let mut state = State::init().await;
+        state.load(TestPlugin {
+            skip: false,
+            called: called.clone(),
+            call_mut: false,
+        });
+        state.load(TestPluginHandler { test_plugin: None });
+
+        let mut event = state.event("reality/0.1.0/tests/testplugin").unwrap();
+        event.with_handler::<TestPluginHandler>().unwrap();
+        event.start().await.unwrap();
+
+        let event = state.event("reality/0.1.0/tests/testpluginhandler").unwrap();
+        let handler = event.call.item.borrow::<TestPluginHandler>().unwrap();
+        assert!(handler.test_plugin.is_some());
+    }
+
     #[test]
     #[should_panic]
     fn test_state_panic_outside_tokio() {
@@ -404,6 +440,37 @@ mod tests {
     impl Content for NotTestPlugin {
         fn state_uuid(&self) -> uuid::Uuid {
             BincodeContent::new(self).unwrap().state_uuid()
+        }
+    }
+
+    #[derive(Clone, Serialize)]
+    struct TestPluginHandler {
+        test_plugin: Option<TestPlugin>,
+    }
+
+    impl Resource for TestPluginHandler {}
+    impl Content for TestPluginHandler {
+        fn state_uuid(&self) -> uuid::Uuid {
+            BincodeContent::new(self).unwrap().state_uuid()
+        }
+    }
+    impl Plugin for TestPluginHandler {
+        fn call(bind: Bind<Self>) -> Result<plugin::SpawnWork> {
+            Ok(bind.work(|_, _| async { Ok(()) }))
+        }
+        fn version() -> Version {
+            Version::new(0, 1, 0)
+        }
+    }
+
+    impl Handler for TestPluginHandler {
+        type Target = TestPlugin;
+
+        fn handle(other: Bind<Self::Target>, mut handler: Bind<Self>) -> Result<()> {
+            let handler = handler.plugin_mut()?;
+            let target = other.plugin()?.clone();
+            handler.test_plugin = Some(target);
+            Ok(())
         }
     }
 

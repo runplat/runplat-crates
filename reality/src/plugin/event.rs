@@ -1,8 +1,7 @@
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
-
-use super::{Address, Call, Thunk};
-use crate::Result;
+use super::{Address, Call, Handler, Thunk};
+use crate::{Error, Result};
 
 /// Intermediary for calling a plugin
 pub struct Event {
@@ -12,6 +11,8 @@ pub struct Event {
     pub(crate) call: Call,
     /// Plugin thunk
     pub(crate) thunk: Thunk,
+    /// Plugin handler thunk
+    pub(crate) handler: Option<Thunk>,
 }
 
 impl Event {
@@ -34,16 +35,36 @@ impl Event {
                 address: self.address.clone(),
                 call: forked,
                 thunk: self.thunk.clone(),
+                handler: self.handler.clone(),
             },
             cancel,
         )
     }
 
+    /// Sets the handler on this event
+    /// 
+    /// Returns an error if the handler's associated Target type does not match
+    /// the current event's plugin type
+    #[inline]
+    pub fn with_handler<H: Handler>(&mut self) -> Result<&mut Self> {
+        if self.call.item.is_type::<H::Target>() {
+            self.handler = Some(Thunk::handler::<H>());
+            Ok(self)
+        } else {
+            Err(Error::PluginMismatch)
+        }
+    }
+
     /// Consumes and starts the event
     #[inline]
     pub async fn start(self) -> Result<()> {
-        debug!(address = self.address().to_string(), "event_start");
-        let work = self.thunk.exec(self.call).await?;
-        work.await
+        if let Some(handler) = self.handler {
+            let work = handler.exec(self.call).await?;
+            work.await
+        } else {
+            debug!(address = self.address().to_string(), "event_start");
+            let work = self.thunk.exec(self.call).await?;
+            work.await
+        }
     }
 }

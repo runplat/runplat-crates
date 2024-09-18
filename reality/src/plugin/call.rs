@@ -5,7 +5,9 @@ use std::marker::PhantomData;
 use runir::store::Item;
 use tokio_util::sync::CancellationToken;
 
+use super::ForkFn;
 use super::Plugin;
+use super::State;
 use super::Work;
 use crate::Error;
 use crate::Result;
@@ -15,8 +17,12 @@ use crate::Result;
 /// Serves as the context when a plugin is called
 #[derive(Clone)]
 pub struct Call {
+    /// 
+    pub(crate) state: State,
     /// Resource associated to this call
     pub(crate) item: Item,
+    /// Function used to fork the item
+    pub(crate) fork_fn: ForkFn,
     /// Child cancellation token that can be used to cancel this call
     pub(crate) cancel: CancellationToken,
     /// Handle to the backing runtime
@@ -41,10 +47,14 @@ impl Call {
     }
 
     /// Creates a fork of this call
+    /// 
+    /// Will call `fork(item)` as well as create a child token for the inner cancel token
     #[inline]
     pub fn fork(&self) -> Call {
         Call {
-            item: self.item.clone(),
+            state: self.state.clone(),
+            item: (self.fork_fn)(&self.item),
+            fork_fn: self.fork_fn.clone(),
             cancel: self.cancel.child_token(),
             handle: self.handle.clone(),
         }

@@ -1,11 +1,13 @@
 mod address;
 mod call;
+mod handler;
 mod event;
 mod name;
 mod state;
 mod thunk;
 mod work;
 
+pub use handler::Handler;
 pub use address::Address;
 pub use call::Bind;
 pub use call::Call;
@@ -29,6 +31,9 @@ pub type SpawnWork = tokio::task::JoinHandle<Result<Work>>;
 
 /// Type-alias for the a thunk function
 pub type ThunkFn = fn(Call) -> Result<SpawnWork>;
+
+/// Type-alias for forking an item
+pub type ForkFn = fn(&Item) -> Item;
 
 /// Plugin trait for implementing extensions within the reality framework
 pub trait Plugin: Resource + Content + Sized {
@@ -67,7 +72,12 @@ pub trait Plugin: Resource + Content + Sized {
         state.load_by_args::<Self>(args)
     }
 
-    /// Fork an item
+    /// Forks the item
+    /// 
+    /// ## Guidance
+    /// Can be overriden to customize how forking is applied to the inner item.
+    /// 
+    /// A plugin can be forked from either a `Call` or `Event` struct
     #[inline]
     fn fork(item: &Item) -> Item {
         item.clone()

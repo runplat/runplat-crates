@@ -1,4 +1,4 @@
-use super::{Call, Name, Plugin, ThunkFn, Work};
+use super::{Call, ForkFn, Handler, Name, Plugin, ThunkFn, Work};
 use crate::Result;
 use runir::{Content, Repr, Resource};
 
@@ -7,8 +7,10 @@ use runir::{Content, Repr, Resource};
 pub struct Thunk {
     /// Name of the plugin that generated this thunk
     name: Name,
-    /// Call function
-    call: ThunkFn,
+    /// Thunk function
+    thunk: ThunkFn,
+    /// Fork function
+    fork: ForkFn,
 }
 
 impl Thunk {
@@ -17,8 +19,27 @@ impl Thunk {
     pub fn new<P: Plugin>() -> Self {
         Thunk {
             name: P::name(),
-            call: P::thunk,
+            thunk: P::thunk,
+            fork: P::fork,
         }
+    }
+
+    /// Returns a thunk for a plugin handler implementation
+    #[inline]
+    pub fn handler<H: Handler>() -> Self {
+        Self { name: H::name(), thunk: H::wrap_thunk, fork: H::fork }
+    }
+
+    /// Returns the thunk fn
+    #[inline]
+    pub fn thunk_fn(&self) -> ThunkFn {
+        self.thunk
+    }
+
+    /// Returns the fork function set for this thunk
+    #[inline]
+    pub fn fork_fn(&self) -> ForkFn {
+        self.fork
     }
 
     /// Returns the name of the plugin that created this thunk
@@ -31,7 +52,7 @@ impl Thunk {
     #[inline]
     #[must_use = "If the future is not awaited, then the call cannot be executed"]
     pub async fn exec(&self, call: Call) -> Result<Work> {
-        (self.call)(call)?.await?
+        (self.thunk)(call)?.await?
     }
 }
 
