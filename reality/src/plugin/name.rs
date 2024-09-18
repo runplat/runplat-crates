@@ -1,10 +1,13 @@
 use runir::*;
 use semver::Version;
 use serde::Serialize;
+use std::str::FromStr;
 use std::{borrow::Cow, collections::BTreeSet, fmt::Display, path::PathBuf};
 
-use crate::BincodeContent;
+pub use utils::LATEST_VERSION;
+pub use utils::parse_name;
 
+use crate::BincodeContent;
 use super::Plugin;
 
 /// Type-alias for a Plugin reference string
@@ -137,6 +140,148 @@ impl Resource for Name {}
 impl Content for Name {
     fn state_uuid(&self) -> uuid::Uuid {
         BincodeContent::new(self).unwrap().state_uuid()
+    }
+}
+
+impl FromStr for Name {
+    type Err = crate::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        utils::parse_name(s)
+    }
+}
+
+pub mod utils {
+    use runir::util::*;
+    use crate::Error;
+    use semver::{BuildMetadata, Prerelease, Version};
+    use std::{collections::BTreeSet, path::PathBuf, str::FromStr};
+
+    use super::Name;
+    use crate::Result;
+
+    /// Type-alias for a plugin ref
+    type PluginRefStr = Delimitted<'/', String, 2>;
+    /// Type-alias for a full plugin ref (without the package prefix)
+    type FullPluginRefStr = Delimitted<'@', String, 2>;
+    /// Type-alias for a plugin.module pair
+    type PluginModuleStr = Delimitted<'.', String, 2>;
+
+    /// Version that represents the "latest" version
+    pub const LATEST_VERSION: Version = Version {
+        major: 0,
+        minor: 0,
+        patch: 0,
+        pre: Prerelease::EMPTY,
+        build: BuildMetadata::EMPTY,
+    };
+
+    /// Parses a `Name` from a string
+    ///
+    /// If the name is not a full reference, `LATEST_VERSION` is used as the version.
+    ///
+    /// The framework will always default to the current framework that is parsing the string.
+    pub fn parse_name(name: &str) -> Result<Name> {
+        let mut iter = PluginRefStr::from_str(name).expect("should be infallible");
+        match iter.next().zip(iter.next()) {
+            Some((package, plugin_ref)) if name.contains("@") => {
+                let mut plugin_ref = FullPluginRefStr::from_str(&plugin_ref).unwrap();
+                match plugin_ref
+                    .next()
+                    .zip(plugin_ref.next().and_then(|v| Version::from_str(&v).ok()))
+                {
+                    Some((module_plugin, version)) => {
+                        let mut plugin_module = PluginModuleStr::from_str(&module_plugin).unwrap();
+                        match plugin_module.next().zip(plugin_module.next()) {
+                            Some((module, plugin)) => {
+                                let path = PathBuf::from(&package)
+                                    .join(version.to_string())
+                                    .join(&module)
+                                    .join(&plugin);
+                                Ok(Name {
+                                    package,
+                                    version,
+                                    module,
+                                    plugin,
+                                    path,
+                                    qualifiers: vec![],
+                                    framework: (env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")),
+                                    matchers: BTreeSet::new(),
+                                }
+                                .init_matchers())
+                            }
+                            None => Err(Error::IncompletePluginName),
+                        }
+                    }
+                    None => Err(Error::IncompletePluginName),
+                }
+            }
+            Some((package, plugin_ref)) => {
+                let mut plugin_module = PluginModuleStr::from_str(&plugin_ref).unwrap();
+                match plugin_module.next().zip(plugin_module.next()) {
+                    Some((module, plugin)) => {
+                        let path = PathBuf::from(&package)
+                            .join(LATEST_VERSION.to_string())
+                            .join(&module)
+                            .join(&plugin);
+                        Ok(Name {
+                            package,
+                            version: LATEST_VERSION,
+                            module,
+                            plugin,
+                            path,
+                            qualifiers: vec![],
+                            framework: (env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")),
+                            matchers: BTreeSet::new(),
+                        }
+                        .init_matchers())
+                    }
+                    None => Err(Error::IncompletePluginName),
+                }
+            }
+            None => Err(Error::IncompletePluginName),
+        }
+    }
+
+    #[test]
+    fn test_parse_name() {
+        use crate::Plugin;
+
+        let name = crate::tests::TestPlugin::name();
+        let full_name = parse_name(&name.full_plugin_ref());
+        assert_eq!("reality/0.1.0/tests/testplugin", full_name.unwrap().path().to_string_lossy());
+
+        let name = parse_name(&name.plugin_ref());
+        assert_eq!("reality/0.0.0/tests/testplugin", name.unwrap().path().to_string_lossy());
+    }
+
+    #[test]
+    fn test_plugin_ref_delimitted_impl() {
+        use crate::Plugin;
+
+        let name = crate::tests::TestPlugin::name();
+        let mut iter = PluginRefStr::from_str(&name.plugin_ref()).unwrap();
+        let package = iter.next();
+        let module_plugin = iter.next();
+        assert_eq!(Some("reality".to_string()), package);
+        assert_eq!(Some("tests.testplugin".to_string()), module_plugin);
+
+        let mut iter = PluginRefStr::from_str(&name.full_plugin_ref()).unwrap();
+        let package = iter.next().unwrap();
+        let plugin_ref = iter.next().unwrap();
+        let mut plugin_ref = FullPluginRefStr::from_str(&plugin_ref).unwrap();
+        let plugin_module = plugin_ref.next();
+        let plugin_version = plugin_ref.next();
+        assert_eq!("reality", package);
+        assert_eq!(Some("tests.testplugin".to_string()), plugin_module);
+        assert_eq!(Some("0.1.0".to_string()), plugin_version);
+
+        let plugin_module = plugin_module.unwrap();
+        let mut plugin_module = PluginModuleStr::from_str(&plugin_module).unwrap();
+        let module = plugin_module.next();
+        let plugin = plugin_module.next();
+        assert_eq!(Some("tests".to_string()), module);
+        assert_eq!(Some("testplugin".to_string()), plugin);
     }
 }
 

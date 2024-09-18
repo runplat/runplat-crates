@@ -2,11 +2,11 @@ mod address;
 mod call;
 mod handler;
 mod event;
-mod name;
 mod state;
 mod thunk;
 mod work;
 
+pub mod name;
 pub use handler::Handler;
 pub use address::Address;
 pub use call::Bind;

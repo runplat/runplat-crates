@@ -1,9 +1,7 @@
 use bytes::{Bytes, BytesMut};
 use clap::Args;
 use http_body_util::combinators::BoxBody;
-use hyper::{
-    body::Incoming, header, Response
-};
+use hyper::{body::Incoming, header, Response};
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use reality::{plugin::Bind, BincodeContent, Content, Plugin, Resource, Uuid, Version};
 use serde::{Deserialize, Serialize};
@@ -631,7 +629,7 @@ http2 = false
 
         let mut engine = Engine::with(state);
         engine
-            .push("kioto/0.1.0/plugins/request")
+            .push(engine.state().event("kioto/0.1.0/plugins/request").unwrap())
             .expect("should be able to push an event");
         let event = engine.event(0).expect("should have this event");
 
@@ -673,7 +671,7 @@ headers = [
 
         let mut engine = Engine::with(state);
         engine
-            .push("kioto/0.1.0/plugins/request")
+            .push(engine.state().event("kioto/0.1.0/plugins/request").unwrap())
             .expect("should be able to push an event");
         let event = engine.event(0).expect("should have this event");
 

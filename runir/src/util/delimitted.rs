@@ -21,7 +21,7 @@ pub type KeyValueVecPairs<T> = Delimitted<';', Delimitted<'=', Delimitted<',', T
 
 /// Struct to define an iterater over a list of strings w/ a character DELIM
 #[derive(PartialEq, PartialOrd)]
-pub struct Delimitted<const DELIM: char, T: FromStr + Send + Sync + 'static> {
+pub struct Delimitted<const DELIM: char, T: FromStr + Send + Sync + 'static, const COUNT: usize = 0> {
     /// Source of the list
     value: String,
     /// Current iterator position
@@ -174,7 +174,7 @@ impl<T: FromStr + Default + Send + Sync + 'static> KeyValueVecPairs<T> {
     }
 }
 
-impl<const DELIM: char, T: FromStr + Send + Sync + 'static> Clone for Delimitted<DELIM, T> {
+impl<const DELIM: char, T: FromStr + Send + Sync + 'static, const COUNT: usize> Clone for Delimitted<DELIM, T, COUNT> {
     fn clone(&self) -> Self {
         Self {
             value: self.value.clone(),
@@ -184,8 +184,8 @@ impl<const DELIM: char, T: FromStr + Send + Sync + 'static> Clone for Delimitted
     }
 }
 
-impl<const DELIM: char, T: FromStr + Send + Sync + 'static> std::fmt::Debug
-    for Delimitted<DELIM, T>
+impl<const DELIM: char, T: FromStr + Send + Sync + 'static, const COUNT: usize> std::fmt::Debug
+    for Delimitted<DELIM, T, COUNT>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Delimitted")
@@ -195,7 +195,7 @@ impl<const DELIM: char, T: FromStr + Send + Sync + 'static> std::fmt::Debug
     }
 }
 
-impl<const DELIM: char, T: FromStr + Send + Sync + 'static> FromStr for Delimitted<DELIM, T> {
+impl<const DELIM: char, const COUNT: usize, T: FromStr + Send + Sync + 'static> FromStr for Delimitted<DELIM, T, COUNT> {
     type Err = Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -207,13 +207,19 @@ impl<const DELIM: char, T: FromStr + Send + Sync + 'static> FromStr for Delimitt
     }
 }
 
-impl<const DELIM: char, T: FromStr + Send + Sync + 'static> Iterator for Delimitted<DELIM, T> {
+impl<const DELIM: char, const COUNT: usize, T: FromStr + Send + Sync + 'static> Iterator for Delimitted<DELIM, T, COUNT> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut value = self.value.split(DELIM).skip(self.cursor);
-        self.cursor += 1;
-        value.next().and_then(|v| T::from_str(v.trim()).ok())
+        if COUNT == 0 {
+            let mut value = self.value.split(DELIM).skip(self.cursor);
+            self.cursor += 1;
+            value.next().and_then(|v| T::from_str(v.trim()).ok())
+        } else {
+            let mut value = self.value.splitn(COUNT, DELIM).skip(self.cursor);
+            self.cursor += 1;
+            value.next().and_then(|v| T::from_str(v.trim()).ok())
+        }
     }
 }
 
@@ -329,7 +335,7 @@ impl<'a, const DELIM1: char, const DELIM2: char, const COUNT: usize> Iterator fo
     }
 }
 
-impl<const DELIM: char, T: FromStr + Send + Sync + 'static> Default for Delimitted<DELIM, T> {
+impl<const DELIM: char, T: FromStr + Send + Sync + 'static, const COUNT: usize> Default for Delimitted<DELIM, T, COUNT> {
     fn default() -> Self {
         Self::from_str("").expect("should be able to parse an empty str")
     }

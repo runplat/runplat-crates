@@ -1,13 +1,13 @@
 mod sequence;
 mod load;
 mod env;
+pub use env::EventConfig;
 pub use env::Env;
 pub use load::Load;
 pub use load::LoadBy;
 pub use load::LoadInput;
 pub use sequence::Sequence;
 
-use std::path::PathBuf;
 use reality::plugin::Event;
 use reality::State;
 
@@ -28,8 +28,7 @@ impl Engine {
 
     /// Creates and pushes a plugin event onto the engine
     #[inline]
-    pub fn push(&mut self, plugin: impl Into<PathBuf>) -> reality::Result<()> {
-        let event = self.state.event(plugin)?;
+    pub fn push(&mut self, event: Event) -> reality::Result<()> {
         self.events.push(event);
         Ok(())
     }

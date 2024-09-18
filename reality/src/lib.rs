@@ -33,6 +33,8 @@ pub enum Error {
     TaskError { is_panic: bool, is_cancel: bool },
     /// Error returned when a plugin could not be loaded from a path
     LoadPluginError,
+    /// Error returned when a `Name` could not be parsed
+    IncompletePluginName,
     /// Error when a plugin cannot be found in the current state
     PluginNotFound,
     /// Error returned when casting a dynamic pointer to a plugin
@@ -94,7 +96,7 @@ impl runir::Content for BincodeContent {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use crate::*;
     use plugin::{Bind, Call, Handler, Plugin, State};
     use runir::Resource;
@@ -424,7 +426,7 @@ mod tests {
     }
 
     #[derive(Clone, Serialize, Debug)]
-    struct NotTestPlugin;
+    pub struct NotTestPlugin;
 
     impl Resource for NotTestPlugin {}
     impl Plugin for NotTestPlugin {
@@ -444,7 +446,7 @@ mod tests {
     }
 
     #[derive(Clone, Serialize)]
-    struct TestPluginHandler {
+    pub struct TestPluginHandler {
         test_plugin: Option<TestPlugin>,
     }
 
@@ -475,7 +477,7 @@ mod tests {
     }
 
     #[derive(Clone, Serialize)]
-    struct TestPlugin {
+    pub struct TestPlugin {
         skip: bool,
         #[serde(skip)]
         called: Arc<OnceLock<bool>>,

@@ -1,4 +1,5 @@
 mod config;
+pub use config::EventConfig;
 pub use config::EngineConfig;
 
 use reality::{Content, Repr, Resource, State, Uuid};
