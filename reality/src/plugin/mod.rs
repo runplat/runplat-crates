@@ -9,10 +9,14 @@ mod work;
 pub use address::Address;
 pub use call::Bind;
 pub use call::Call;
+use clap::ArgMatches;
+use clap::FromArgMatches;
 pub use event::Event;
 pub use name::Name;
+use runir::store::Item;
 use runir::Content;
 use semver::Version;
+use serde::de::DeserializeOwned;
 pub use state::State;
 pub use thunk::Thunk;
 pub use work::Work;
@@ -32,7 +36,7 @@ pub trait Plugin: Resource + Content + Sized {
     fn call(bind: Bind<Self>) -> Result<SpawnWork>;
 
     /// Plugin version
-    /// 
+    ///
     /// **Recommendation**: Implementation should just use `env!("CARGO_PKG_VERSION")` to avoid confusion
     fn version() -> Version;
 
@@ -43,6 +47,30 @@ pub trait Plugin: Resource + Content + Sized {
     fn thunk(call: Call) -> Result<SpawnWork> {
         let bind = call.bind::<Self>()?;
         Self::call(bind)
+    }
+
+    /// Loads this plugin by toml
+    #[inline]
+    fn load_by_toml(state: &mut State, toml: &str) -> std::io::Result<Address>
+    where
+        Self: DeserializeOwned,
+    {
+        state.load_by_toml::<Self>(toml)
+    }
+
+    /// Loads this plugin by cli args
+    #[inline]
+    fn load_by_args(state: &mut State, args: &ArgMatches) -> std::io::Result<Address>
+    where
+        Self: FromArgMatches,
+    {
+        state.load_by_args::<Self>(args)
+    }
+
+    /// Fork an item
+    #[inline]
+    fn fork(item: &Item) -> Item {
+        item.clone()
     }
 
     /// Name of this plugin

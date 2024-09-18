@@ -130,7 +130,7 @@ mod tests {
         });
 
         state
-            .load_toml::<TomlPlugin>(&toml.expect("should be able to serialize"))
+            .load_by_toml::<TomlPlugin>(&toml.expect("should be able to serialize"))
             .expect("should be able to load");
 
         let addr = state
@@ -146,13 +146,13 @@ mod tests {
     #[tokio::test]
     async fn test_plugin_replacement() {
         let mut state = State::new();
-        state.register(TestPlugin {
+        state.load(TestPlugin {
             skip: false,
             called: Arc::new(OnceLock::new()),
             call_mut: false,
         });
 
-        state.register(TestPlugin {
+        state.load(TestPlugin {
             skip: true,
             called: Arc::new(OnceLock::new()),
             call_mut: false,
@@ -172,7 +172,7 @@ mod tests {
     #[tokio::test]
     async fn test_plugin_work_cancel() {
         let mut state = State::new();
-        state.register(TestPlugin {
+        state.load(TestPlugin {
             skip: false,
             called: Arc::new(OnceLock::new()),
             call_mut: false,
@@ -215,7 +215,7 @@ mod tests {
     #[tokio::test]
     async fn test_plugin_mismatch() {
         let mut state = State::new();
-        state.register(TestPlugin {
+        state.load(TestPlugin {
             skip: false,
             called: Arc::new(OnceLock::new()),
             call_mut: false,
@@ -281,7 +281,7 @@ mod tests {
     async fn test_plugin_call() {
         let called = Arc::new(OnceLock::new());
         let mut state = State::init().await;
-        state.register(TestPlugin {
+        state.load(TestPlugin {
             skip: false,
             called: called.clone(),
             call_mut: false,
@@ -298,7 +298,7 @@ mod tests {
     async fn test_plugin_call_work_mut() {
         let called = Arc::new(OnceLock::new());
         let mut state = State::init().await;
-        state.register(TestPlugin {
+        state.load(TestPlugin {
             skip: false,
             called: called.clone(),
             call_mut: true,
@@ -319,7 +319,7 @@ mod tests {
     async fn test_plugin_call_skip() {
         let called = Arc::new(OnceLock::new());
         let mut state = State::init().await;
-        state.register(TestPlugin {
+        state.load(TestPlugin {
             skip: true,
             called: called.clone(),
             call_mut: false,
@@ -349,7 +349,7 @@ mod tests {
     async fn test_plugin_call_by_path() {
         let called = Arc::new(OnceLock::new());
         let mut state = State::init().await;
-        state.register(TestPlugin {
+        state.load(TestPlugin {
             skip: false,
             called: called.clone(),
             call_mut: false,
@@ -367,7 +367,7 @@ mod tests {
             .unwrap();
         let called = Arc::new(OnceLock::new());
         let mut state = State::with(rt.handle().clone());
-        state.register(TestPlugin {
+        state.load(TestPlugin {
             skip: false,
             called: called.clone(),
             call_mut: false,

@@ -488,6 +488,7 @@ dependencies = [
  "hyper-util",
  "reality",
  "serde",
+ "shlex",
  "tokio",
  "tokio-native-tls",
  "toml_edit",

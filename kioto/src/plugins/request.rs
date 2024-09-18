@@ -590,7 +590,7 @@ mod tests {
         let mut state = State::new();
 
         state
-            .load_toml::<Request>(
+            .load_by_toml::<Request>(
                 r#"
 url = "https://jsonplaceholder.typicode.com/posts"
 http2 = false
@@ -620,7 +620,7 @@ http2 = false
     async fn test_request_plugin_call_from_engine() {
         let mut state = State::new();
         state
-            .load_toml::<Request>(
+            .load_by_toml::<Request>(
                 r#"
 url = "https://jsonplaceholder.typicode.com/posts"
 http2 = false
@@ -652,7 +652,7 @@ http2 = false
     async fn test_request_plugin_call_from_engine_post_with_json() {
         let mut state = State::new();
         state
-            .load_toml::<Request>(
+            .load_by_toml::<Request>(
                 r#"
 url = "https://jsonplaceholder.typicode.com/posts"
 method = "POST"
@@ -716,7 +716,7 @@ headers = [
         let (_, subcommand) = matches.subcommand().unwrap();
 
         state
-            .parse_args::<RequestArgs>(subcommand)
+            .load_by_args::<RequestArgs>(subcommand)
             .expect("should be able to load request");
 
         let mut plugin = state

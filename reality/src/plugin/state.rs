@@ -7,6 +7,7 @@ use crate::{
 };
 use clap::ArgMatches;
 use runir::store::Item;
+use runir::Store;
 use runir::{repo::Handle, repr::Attributes};
 use serde::de::DeserializeOwned;
 use std::future::Future;
@@ -65,32 +66,47 @@ impl State {
         Self::new()
     }
 
+    /// Returns a reference to the inner store
+    #[inline]
+    pub fn store(&self) -> &Store {
+        &self.store
+    }
+
+    /// Returns a mutable reference to the inner store
+    #[inline]
+    pub fn store_mut(&mut self) -> &mut Store {
+        &mut self.store
+    }
+
+    /// Closes this state by cancelling the inner cancel token
+    #[inline]
+    pub fn close(&self) {
+        self.cancel.cancel()
+    }
+
     /// Registers a plugin from parsing cli arg matches
     #[inline]
-    pub fn parse_args<P: Plugin + clap::FromArgMatches>(
+    pub fn load_by_args<P: Plugin + clap::FromArgMatches>(
         &mut self,
         matches: &ArgMatches,
-    ) -> std::io::Result<()> {
+    ) -> std::io::Result<Address> {
         let plugin = P::from_arg_matches(matches)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()))?;
 
-        self.register(plugin);
-
-        Ok(())
+        Ok(self.load(plugin))
     }
 
     /// Loads and registers a plugin from toml
     #[inline]
-    pub fn load_toml<P: Plugin + DeserializeOwned>(&mut self, toml: &str) -> std::io::Result<()> {
+    pub fn load_by_toml<P: Plugin + DeserializeOwned>(&mut self, toml: &str) -> std::io::Result<Address> {
         let plugin = toml::from_str::<P>(toml)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.message()))?;
-        self.register(plugin);
-        Ok(())
+        Ok(self.load(plugin))
     }
 
     /// Registers a plugin w/ the the current state
     #[inline]
-    pub fn register<P: Plugin>(&mut self, plugin: P) -> &mut Self {
+    pub fn load<P: Plugin>(&mut self, plugin: P) -> Address {
         use crate::plugin::MustLoad;
         let name = P::name();
         let put = self.store.put(plugin);
@@ -98,9 +114,10 @@ impl State {
         self.plugins.insert(name.path().clone(), handle.clone());
         self.plugins.insert(
             name.path().join(hex::encode(handle.commit().to_be_bytes())),
-            handle,
+            handle.clone(),
         );
-        self
+
+        Address { name, commit: handle.commit() }
     }
 
     /// Calls a plugin, returns a future which can be awaited for the result
