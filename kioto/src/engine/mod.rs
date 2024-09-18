@@ -1,3 +1,6 @@
+mod sequence;
+pub use sequence::Sequence;
+
 use std::path::PathBuf;
 use reality::plugin::Event;
 use reality::State;

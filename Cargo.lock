@@ -490,6 +490,7 @@ dependencies = [
  "serde",
  "tokio",
  "tokio-native-tls",
+ "toml_edit",
  "tracing",
  "url",
 ]
