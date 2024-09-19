@@ -1,13 +1,8 @@
-use crate::engine::env::EnvLoader;
-use crate::Errors;
-use crate::PluginLoadErrors;
-use crate::Result;
-use reality::plugin::Address;
-use reality::plugin::Name;
+use crate::{engine::env::EnvLoader, Errors, PluginLoadErrors, Result};
+use reality::plugin::{Address, Name};
 use serde::{Deserialize, Serialize};
-use std::io::Read;
-use std::str::FromStr;
-use std::{collections::BTreeMap, path::PathBuf};
+use tracing::debug;
+use std::{collections::BTreeMap, io::Read, path::PathBuf, str::FromStr};
 
 /// Define settings settings for configuring a plugin
 #[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -38,6 +33,7 @@ impl Config {
         } else {
             let path = loader
                 .root_dir
+                .join("etc")
                 .join(name.path())
                 .join(format!("{event}.toml"));
             load_toml(event, name, &path, loader)
@@ -47,6 +43,7 @@ impl Config {
 
 /// Loads toml from an env loader
 fn load_toml(event: &str, name: Name, path: &PathBuf, loader: &mut EnvLoader) -> Result<Address> {
+    debug!("Trying to load {path:?}");
     match std::fs::OpenOptions::new().read(true).open(path) {
         Ok(mut opened) => {
             let mut toml = String::new();
