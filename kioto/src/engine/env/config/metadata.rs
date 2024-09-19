@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Metadata {
+    env: String,
     src: PathBuf,
     #[serde(rename = "src-size")]
     src_size: u64,

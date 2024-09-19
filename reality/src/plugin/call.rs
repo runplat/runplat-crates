@@ -96,6 +96,12 @@ impl<P: Plugin> Bind<P> {
         }
     }
 
+    /// Returns the current tokio handle
+    #[inline]
+    pub fn handle(&self) -> &tokio::runtime::Handle {
+        &self.call.handle
+    }
+
     /// Returns the item bound to this call
     #[inline]
     pub fn item(&self) -> &Item {

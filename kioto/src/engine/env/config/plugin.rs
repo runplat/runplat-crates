@@ -60,6 +60,7 @@ fn load_toml(event: &str, name: Name, path: &PathBuf, loader: &mut EnvLoader) ->
                     let mut crc = crc().digest();
                     crc.update(settings.to_string().as_bytes());
                     metadata["crc-ms"] = value(hex::encode(crc.finalize().to_be_bytes()));
+                    metadata["env"] = value(&loader.label);
 
                     // **Note**: Store in a field that isn't a native rust field, however
                     // callers can opt in to deserialize if they wish

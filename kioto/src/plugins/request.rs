@@ -5,12 +5,14 @@ use hyper::{body::Incoming, header, Response};
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use reality::{plugin::Bind, BincodeContent, Content, Plugin, Resource, Uuid, Version};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, future::Future, path::PathBuf, pin::Pin, sync::OnceLock, task::Poll};
+use std::{future::Future, path::PathBuf, pin::Pin, sync::OnceLock, task::Poll};
 use tokio::{net::TcpStream, select};
 use tracing::{debug, error, trace, warn};
 use url::Url;
 
 use crate::engine::Metadata;
+
+use super::utils::{with_cancel, PluginCommands};
 
 /// Type-alias for the default result type returned by this plugin's plumbing
 type Result<T> = std::io::Result<T>;
@@ -67,7 +69,11 @@ pub struct RequestArgs {
     #[clap(long = "http2")]
     use_http2: bool,
     /// Url to send the request to
+    #[clap(long, short, required=true)]
     url: Url,
+    /// Plugin command to execute
+    #[clap(subcommand)]
+    command: PluginCommands,
     /// Built request when this plugin is loaded
     #[clap(skip)]
     request: Option<Request>,
@@ -88,29 +94,41 @@ impl Plugin for RequestArgs {
                         .await
                         .map_err(|e| binding.plugin_call_error(e.to_string()))?;
 
-                    let req_fut = req.client()(request);
-                    let ct_fut = ct.cancelled();
-
-                    select! {
-                        resp = req_fut => {
-                            match resp {
-                                Ok(resp) => {
-                                    if req.response.is_some() {
-                                        Err(binding.plugin_call_error("Response was already set and has not been handled"))
-                                    } else {
-                                        req.response = Some(resp);
-                                        Ok(())
-                                    }
-                                },
-                                Err(err) => {
-                                    Err(binding.plugin_call_error(err.to_string()))
-                                },
-                            }
-                        },
-                        _ = ct_fut => {
-                            Err(binding.plugin_call_cancelled())
+                    with_cancel(ct).run(req.client()(request), |o| {
+                        match o {
+                            Ok(resp) => {
+                                if req.response.is_some() {
+                                    Err(binding.plugin_call_error("Response was already set and has not been handled"))
+                                } else {
+                                    req.response = Some(resp);
+                                    Ok(())
+                                }
+                            },
+                            Err(err) => {
+                                Err(binding.plugin_call_error(err.to_string()))
+                            },
                         }
-                    }
+                    }).await
+                    // select! {
+                    //     resp = req_fut => {
+                    //         match resp {
+                    //             Ok(resp) => {
+                    //                 if req.response.is_some() {
+                    //                     Err(binding.plugin_call_error("Response was already set and has not been handled"))
+                    //                 } else {
+                    //                     req.response = Some(resp);
+                    //                     Ok(())
+                    //                 }
+                    //             },
+                    //             Err(err) => {
+                    //                 Err(binding.plugin_call_error(err.to_string()))
+                    //             },
+                    //         }
+                    //     },
+                    //     _ = ct_fut => {
+                    //         Err(binding.plugin_call_cancelled())
+                    //     }
+                    // }
                 } else {
                     Err(binding.plugin_call_error("Request was not loaded"))
                 }

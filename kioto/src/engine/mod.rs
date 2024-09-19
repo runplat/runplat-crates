@@ -1,6 +1,7 @@
 mod env;
 mod load;
 mod sequence;
+pub use env::default_env;
 pub use env::Env;
 pub use env::EnvLoader;
 pub use env::Metadata;

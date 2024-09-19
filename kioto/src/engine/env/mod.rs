@@ -51,6 +51,7 @@ impl Env {
             .load(&mut loader)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, format!("{e:?}")))?;
         loader.config = config;
+        loader.label = self.label.clone();
         Ok(loader)
     }
 
@@ -82,6 +83,8 @@ impl Default for Env {
 
 /// Struct containing state for loading an environment
 pub struct EnvLoader {
+    /// Env label
+    pub label: String,
     /// Root directory
     pub root_dir: PathBuf,
     /// State
@@ -171,6 +174,7 @@ impl EnvLoader {
 /// Creates an env w/ default set of plugins
 pub fn default_env() -> EnvLoader {
     let mut loader = EnvLoader {
+        label: String::from("default"),
         root_dir: PathBuf::from(".kt").join("default"),
         state: State::new(),
         config: EngineConfig::default(),
@@ -197,6 +201,7 @@ macro_rules! test_env {
             /// Creates an env w/ default set of plugins
             fn test_env() -> EnvLoader {
                 let mut loader = EnvLoader {
+                    label: String::from(stringify!($name)),
                     root_dir: std::path::PathBuf::from(".test").join(stringify!($name)),
                     state: State::new(),
                     config: EngineConfig::default(),
