@@ -483,6 +483,7 @@ version = "0.1.0"
 dependencies = [
  "bytes",
  "clap",
+ "hex",
  "http-body-util",
  "hyper",
  "hyper-util",

@@ -1,6 +1,7 @@
 use crate::{engine::env::EnvLoader, Errors, PluginLoadErrors, Result};
-use reality::plugin::{Address, Name};
+use reality::{content::crc, plugin::{Address, Name}};
 use serde::{Deserialize, Serialize};
+use toml_edit::value;
 use tracing::debug;
 use std::{collections::BTreeMap, io::Read, path::PathBuf, str::FromStr};
 
@@ -48,8 +49,22 @@ fn load_toml(event: &str, name: Name, path: &PathBuf, loader: &mut EnvLoader) ->
         Ok(mut opened) => {
             let mut toml = String::new();
             match opened.read_to_string(&mut toml) {
-                Ok(_) => {
-                    let settings = toml_edit::DocumentMut::from_str(&toml).unwrap();
+                Ok(size) => {
+                    let mut settings = toml_edit::DocumentMut::from_str(&toml).unwrap();
+
+                    // Insert a metadata table w/ information on the source being loaded
+                    let mut metadata = toml_edit::Table::new();
+                    metadata["src"] = value(path.to_string_lossy().to_string());
+                    metadata["src-size"] = value(size as i64);
+                    metadata["event"] = value(event);
+                    let mut crc = crc().digest();
+                    crc.update(settings.to_string().as_bytes());
+                    metadata["crc-ms"] = value(hex::encode(crc.finalize().to_be_bytes()));
+
+                    // **Note**: Store in a field that isn't a native rust field, however
+                    // callers can opt in to deserialize if they wish
+                    settings["_kt-meta"] = toml_edit::Item::Table(metadata.into());
+                    
                     Ok(loader.load(&name, settings.as_table()).unwrap())
                 }
                 Err(io) => Err(Errors::PluginLoadError(

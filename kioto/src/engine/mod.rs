@@ -101,7 +101,7 @@ mod tests {
             })
             .unwrap();
         assert_eq!(
-            "kioto/0.1.0/plugins/request/1b56bd09f0e93dd5",
+            "kioto/0.1.0/plugins/request/b71c8b87cf79b5e2",
             event.address().to_string()
         );
 
@@ -112,7 +112,7 @@ mod tests {
             })
             .unwrap();
         assert_eq!(
-            "kioto/0.1.0/plugins/request/6f0fe007faacc85d",
+            "kioto/0.1.0/plugins/request/f2be9205a4ec01c7",
             event.address().to_string()
         );
     }

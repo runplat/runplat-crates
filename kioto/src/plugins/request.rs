@@ -5,7 +5,7 @@ use hyper::{body::Incoming, header, Response};
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use reality::{plugin::Bind, BincodeContent, Content, Plugin, Resource, Uuid, Version};
 use serde::{Deserialize, Serialize};
-use std::{future::Future, path::PathBuf, pin::Pin, sync::OnceLock, task::Poll};
+use std::{collections::BTreeMap, future::Future, path::PathBuf, pin::Pin, sync::OnceLock, task::Poll};
 use tokio::{net::TcpStream, select};
 use tracing::{debug, error, trace, warn};
 use url::Url;
@@ -203,6 +203,8 @@ pub struct Request {
     /// Response this request received
     #[serde(skip)]
     response: Option<Response<Incoming>>,
+    #[serde(default, rename = "_kt-meta")]
+    _meta: BTreeMap<String, String>,
 }
 
 /// Bytes Body
@@ -274,6 +276,7 @@ impl Request {
             method: None,
             headers: vec![],
             response: None,
+            _meta: BTreeMap::new(),
         }
     }
 

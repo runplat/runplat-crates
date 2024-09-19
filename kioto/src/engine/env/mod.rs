@@ -81,10 +81,13 @@ impl Default for Env {
 
 /// Struct containing state for loading an environment
 pub struct EnvLoader {
+    /// Root directory
     pub root_dir: PathBuf,
+    /// State
     pub state: State,
     /// Engine config for this environment
     pub config: EngineConfig,
+    /// Map of prepared loaders
     pub loaders: BTreeSet<(Name, Handle)>,
 }
 
