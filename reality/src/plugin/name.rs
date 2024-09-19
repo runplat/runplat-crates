@@ -8,13 +8,13 @@ pub use utils::LATEST_VERSION;
 pub use utils::parse_name;
 
 use crate::BincodeContent;
-use super::Plugin;
+use super::{Address, Plugin};
 
 /// Type-alias for a Plugin reference string
 pub type PluginRef<'a> = Cow<'a, str>;
 
 /// Struct containing name data
-#[derive(Debug, Serialize, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Serialize, Clone, PartialEq, PartialOrd, Eq, Ord)]
 pub struct Name {
     pub(crate) package: String,
     pub(crate) version: Version,
@@ -107,6 +107,12 @@ impl Name {
     #[inline]
     pub fn qualifiers(&self) -> impl Iterator<Item = &str> {
         self.qualifiers.iter().map(|q| q.as_str())
+    }
+
+    /// Returns an address w/ commit
+    #[inline]
+    pub fn address(&self, commit: u64) -> Address {
+        Address { name: self.clone(), commit }
     }
 
     /// Initializes matchers for this name

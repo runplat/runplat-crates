@@ -14,6 +14,7 @@ pub use plugin::State;
 /// Re-export runir since it will be required for extending reality
 pub use runir;
 pub use runir::*;
+pub use runir::content;
 
 /// Re-export common types
 pub use semver::Version;

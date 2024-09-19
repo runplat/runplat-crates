@@ -1,8 +1,10 @@
-use std::{io::Error, marker::PhantomData};
-
 use clap::{ArgMatches, FromArgMatches};
-use reality::{plugin::{Address, Name}, Content, Plugin, Repr, Resource, State};
+use reality::{
+    plugin::{Address, Name},
+    Content, Plugin, Repr, Resource, State,
+};
 use serde::de::DeserializeOwned;
+use std::io::Error;
 
 /// Type-alias for a function to load a plugin by toml
 type LoadByToml = fn(&mut State, &str) -> std::io::Result<Address>;
@@ -11,15 +13,16 @@ type LoadByToml = fn(&mut State, &str) -> std::io::Result<Address>;
 type LoadByArgs = fn(&mut State, &ArgMatches) -> std::io::Result<Address>;
 
 /// Resource for loading a plugin
-pub struct Load<P: Plugin> {
+#[derive(Clone)]
+pub struct Load {
     /// Name of the plugin this resource is configured to load
     name: Name,
     /// Load function
     load: LoadBy,
-    _p: PhantomData<P>
 }
 
 /// Enumeration of load plugin functions
+#[derive(Clone)]
 pub enum LoadBy {
     /// Load plugin by toml
     Toml(LoadByToml),
@@ -32,41 +35,50 @@ pub enum LoadInput {
     /// Toml input
     Toml(String),
     /// Arg matches
-    Args(ArgMatches)
+    Args(ArgMatches),
 }
 
-impl<P: Plugin> Load<P> {
+impl Load {
     /// Loads a plugin from input
     #[inline]
-    pub fn load<'load>(&'load self, state: &mut State, input: impl Into<LoadInput>) -> std::io::Result<Address> {
+    pub fn load<'load>(
+        &'load self,
+        state: &mut State,
+        input: impl Into<LoadInput>,
+    ) -> std::io::Result<Address> {
         let input = input.into();
         match (&self.load, input) {
-            (LoadBy::Toml(load_toml), LoadInput::Toml(input_toml)) => {
-                load_toml(state, &input_toml)
-            },
-            (LoadBy::Args(load_args), LoadInput::Args(input_args)) => {
-                load_args(state, &input_args)
-            },
-            _ => Err(Error::new(std::io::ErrorKind::InvalidInput, "Could not load input with provided input settings"))
+            (LoadBy::Toml(load_toml), LoadInput::Toml(input_toml)) => load_toml(state, &input_toml),
+            (LoadBy::Args(load_args), LoadInput::Args(input_args)) => load_args(state, &input_args),
+            _ => Err(Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Could not load input with provided input settings",
+            )),
         }
     }
-    
+
     /// Creates a load resource for a plugin to load by cli arg matches
     #[inline]
-    pub fn by_args() -> Self 
-    where 
-        P: FromArgMatches
+    pub fn by_args<P>() -> Self
+    where
+        P: Plugin + FromArgMatches,
     {
-        Self { name: P::name(), load: LoadBy::Args(P::load_by_args), _p: PhantomData }
+        Self {
+            name: P::name(),
+            load: LoadBy::Args(P::load_by_args),
+        }
     }
 
     /// Creates a load resource for a plugin to load by toml
     #[inline]
-    pub fn by_toml() -> Self
-    where 
-        P: DeserializeOwned
+    pub fn by_toml<P>() -> Self
+    where
+        P: Plugin + DeserializeOwned,
     {
-        Self { name: P::name(), load: LoadBy::Toml(P::load_by_toml), _p: PhantomData }
+        Self {
+            name: P::name(),
+            load: LoadBy::Toml(P::load_by_toml),
+        }
     }
 
     /// Returns the name of the plugin this resource loads
@@ -88,10 +100,14 @@ impl<'l> From<&'l toml_edit::Table> for LoadInput {
     }
 }
 
-impl<P: Plugin> Content for Load<P> {
+impl Content for Load {
     fn state_uuid(&self) -> reality::uuid::Uuid {
-        todo!()
+        let mut crc = reality::content::crc().digest();
+        crc.update(self.name.full_plugin_ref().as_bytes());
+        crc.update(std::any::type_name::<Self>().as_bytes());
+        crc.update(b"load");
+        reality::Uuid::from_u64_pair(crc.finalize(), 0)
     }
 }
-impl<P: Plugin> Resource for Load<P> {}
-impl<P: Plugin> Repr for Load<P> {}
+impl Resource for Load {}
+impl Repr for Load {}

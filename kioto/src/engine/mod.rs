@@ -2,6 +2,7 @@ mod sequence;
 mod load;
 mod env;
 pub use env::EventConfig;
+pub use env::EnvLoader;
 pub use env::Env;
 pub use load::Load;
 pub use load::LoadBy;

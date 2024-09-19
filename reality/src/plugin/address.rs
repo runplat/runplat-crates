@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use serde::Serialize;
 
 use super::Name;
@@ -13,11 +15,17 @@ pub struct Address {
 
 impl std::fmt::Display for Address {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let path = self
-            .name
-            .path()
-            .join(hex::encode(self.commit.to_be_bytes()));
+        let path: PathBuf = self.into();
         let path = path.to_string_lossy();
         write!(f, "{path}")
+    }
+}
+
+impl From<&Address> for PathBuf {
+    fn from(value: &Address) -> Self {
+        value
+            .name
+            .path()
+            .join(hex::encode(value.commit.to_be_bytes()))
     }
 }

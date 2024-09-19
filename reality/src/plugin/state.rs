@@ -6,7 +6,7 @@ use crate::{
     Result,
 };
 use clap::ArgMatches;
-use runir::store::Item;
+use runir::store::{Item, Put};
 use runir::Store;
 use runir::{repo::Handle, repr::Attributes};
 use serde::de::DeserializeOwned;
@@ -91,34 +91,70 @@ impl State {
         &mut self,
         matches: &ArgMatches,
     ) -> std::io::Result<Address> {
-        let plugin = P::from_arg_matches(matches)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()))?;
-
-        Ok(self.load(plugin))
+        self.load_by_args_with(matches, |p: Put<'_, P>| p)
     }
 
     /// Loads and registers a plugin from toml
     #[inline]
-    pub fn load_by_toml<P: Plugin + DeserializeOwned>(&mut self, toml: &str) -> std::io::Result<Address> {
-        let plugin = toml::from_str::<P>(toml)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.message()))?;
-        Ok(self.load(plugin))
+    pub fn load_by_toml<P: Plugin + DeserializeOwned>(
+        &mut self,
+        toml: &str,
+    ) -> std::io::Result<Address> {
+        self.load_by_toml_with(toml, |p: Put<'_, P>| p)
     }
 
     /// Registers a plugin w/ the the current state
     #[inline]
     pub fn load<P: Plugin>(&mut self, plugin: P) -> Address {
+        self.load_with(plugin, |p: Put<'_, P>| p)
+    }
+
+    /// Registers a plugin from parsing cli arg matches
+    #[inline]
+    pub fn load_by_args_with<P: Plugin + clap::FromArgMatches>(
+        &mut self,
+        matches: &ArgMatches,
+        extend: impl Fn(runir::store::Put<'_, P>) -> runir::store::Put<'_, P>,
+    ) -> std::io::Result<Address> {
+        let plugin = P::from_arg_matches(matches)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()))?;
+
+        Ok(self.load_with(plugin, extend))
+    }
+
+    /// Loads and registers a plugin from toml
+    #[inline]
+    pub fn load_by_toml_with<P: Plugin + DeserializeOwned>(
+        &mut self,
+        toml: &str,
+        extend: impl Fn(runir::store::Put<'_, P>) -> runir::store::Put<'_, P>,
+    ) -> std::io::Result<Address> {
+        let plugin = toml::from_str::<P>(toml)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.message()))?;
+        Ok(self.load_with(plugin, extend))
+    }
+
+    /// Registers a plugin w/ the the current state
+    #[inline]
+    pub fn load_with<P: Plugin>(
+        &mut self,
+        plugin: P,
+        extend: impl Fn(runir::store::Put<'_, P>) -> runir::store::Put<'_, P>,
+    ) -> Address {
         use crate::plugin::MustLoad;
         let name = P::name();
         let put = self.store.put(plugin);
-        let handle = P::load(P::must_load(put)).commit();
+        let handle = extend(P::load(P::must_load(put))).commit();
         self.plugins.insert(name.path().clone(), handle.clone());
         self.plugins.insert(
             name.path().join(hex::encode(handle.commit().to_be_bytes())),
             handle.clone(),
         );
 
-        Address { name, commit: handle.commit() }
+        Address {
+            name,
+            commit: handle.commit(),
+        }
     }
 
     /// Calls a plugin, returns a future which can be awaited for the result
@@ -183,7 +219,7 @@ impl State {
                     address,
                     call,
                     thunk: thunk.as_ref().clone(),
-                    handler: None
+                    handler: None,
                 })
             }
             None => Err(Error::PluginNotFound),

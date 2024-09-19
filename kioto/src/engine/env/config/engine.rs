@@ -1,9 +1,7 @@
-use std::{collections::BTreeMap, path::PathBuf};
-
-use crate::Result;
-use reality::State;
+use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
-
+use tracing::info;
+use crate::{engine::env::EnvLoader, Result};
 use super::PluginConfig;
 
 /// Configures an engine environment
@@ -24,7 +22,11 @@ pub struct Config {
 
 impl Config {
     /// Load the engine config into state
-    pub fn load(&self, state: &mut State, root: PathBuf) -> Result<()> {
+    pub fn load(&self, loader: &mut EnvLoader) -> Result<()> {
+        for (event_name, conf) in self.plugins.iter() {
+            info!("Loading `{event_name}`");
+            conf.load(&event_name, loader)?;
+        }
         Ok(())
     }
 }

@@ -1,6 +1,13 @@
-use std::{collections::BTreeMap, path::PathBuf};
-
+use crate::engine::env::EnvLoader;
+use crate::Errors;
+use crate::PluginLoadErrors;
+use crate::Result;
+use reality::plugin::Address;
+use reality::plugin::Name;
 use serde::{Deserialize, Serialize};
+use std::io::Read;
+use std::str::FromStr;
+use std::{collections::BTreeMap, path::PathBuf};
 
 /// Define settings settings for configuring a plugin
 #[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -12,6 +19,57 @@ pub struct Config {
     /// Labels to add as an attribute after loading the plugin
     #[serde(default)]
     labels: BTreeMap<String, String>,
+}
+
+impl Config {
+    /// Loads the plugin from this config into state
+    ///
+    /// Returns an error if the plugin could not be loaded successfully
+    #[inline]
+    pub fn load(&self, event: &str, loader: &mut EnvLoader) -> Result<Address> {
+        let name = Name::from_str(&self.plugin)?;
+        if let Some(load) = self.load.as_ref() {
+            match load {
+                LoadSource::File {
+                    path,
+                    format: SourceFormats::Toml,
+                } => load_toml(event, name, path, loader),
+            }
+        } else {
+            let path = loader
+                .root_dir
+                .join(name.path())
+                .join(format!("{event}.toml"));
+            load_toml(event, name, &path, loader)
+        }
+    }
+}
+
+/// Loads toml from an env loader
+fn load_toml(event: &str, name: Name, path: &PathBuf, loader: &mut EnvLoader) -> Result<Address> {
+    match std::fs::OpenOptions::new().read(true).open(path) {
+        Ok(mut opened) => {
+            let mut toml = String::new();
+            match opened.read_to_string(&mut toml) {
+                Ok(_) => {
+                    let settings = toml_edit::DocumentMut::from_str(&toml).unwrap();
+                    Ok(loader.load(&name, settings.as_table()).unwrap())
+                }
+                Err(io) => Err(Errors::PluginLoadError(
+                    PluginLoadErrors::CouldNotReadFile {
+                        error: crate::CouldNotLoadPlugin::new(event, name),
+                        io,
+                    },
+                )),
+            }
+        }
+        Err(io) => Err(Errors::PluginLoadError(
+            PluginLoadErrors::CouldNotReadFile {
+                error: crate::CouldNotLoadPlugin::new(event, name),
+                io,
+            },
+        )),
+    }
 }
 
 /// Enumeration of load plugin source variants
@@ -45,14 +103,14 @@ pub enum SourceFormats {
 
 #[cfg(test)]
 mod tests {
-    use reality::Plugin;
-    use crate::plugins::Request;
     use super::*;
+    use crate::plugins::Request;
+    use reality::Plugin;
 
     #[test]
     fn test_deser_config_enum_types() {
         let s = toml::from_str::<Config>(
-r#"
+            r#"
 plugin = "kioto/plugins.request"
 load = { type = "file", path = "etc/test", format = "toml" }
 "#,
@@ -74,7 +132,7 @@ load = { type = "file", path = "etc/test", format = "toml" }
     #[test]
     fn test_deser_config_defaults() {
         let s = toml::from_str::<Config>(
-r#"
+            r#"
 plugin = "kioto/plugins.request"
 load = { type = "file" }
 "#,

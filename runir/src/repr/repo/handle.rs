@@ -74,9 +74,38 @@ impl PartialEq for Handle {
 
 impl PartialOrd for Handle {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.commit.partial_cmp(&other.commit)
+        match self.commit.partial_cmp(&other.commit) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.cast.partial_cmp(&other.cast)
     }
 }
 
+impl Ord for Handle {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (
+                Handle {
+                    commit: commit_self,
+                    cast: cast_self,
+                    ..
+                },
+                Handle {
+                    commit: commit_other,
+                    cast: cast_other,
+                    ..
+                },
+            ) => match commit_self.cmp(&commit_other) {
+                std::cmp::Ordering::Equal => match cast_self.cmp(&cast_other) {
+                    std::cmp::Ordering::Equal => std::cmp::Ordering::Equal,
+                    c => return c,
+                },
+                c => return c,
+            },
+        }
+    }
+}
+impl Eq for Handle {}
 impl Resource for DynHead {}
 impl Repr for DynHead {}
