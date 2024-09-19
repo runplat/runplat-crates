@@ -1,10 +1,11 @@
 use clap::ArgMatches;
 use reality::{
-    plugin::{Bind, Call, Handler, SpawnWork}, store::Item, Content, Plugin, Repr, Resource, Uuid
+    plugin::{Bind, Handler, SpawnWork},
+    Content, Plugin, Repr, Resource, Uuid,
 };
 
-use tracing::debug;
 use super::utils::with_cancel;
+use tokio::io::{stdin, AsyncBufReadExt, BufReader};
 
 /// Repl plugin is a handler plugin that can be used to interact and test other plugins
 pub struct Repl<T: Plugin> {
@@ -14,21 +15,46 @@ pub struct Repl<T: Plugin> {
 
 impl<T: Plugin> Plugin for Repl<T> {
     fn call(bind: reality::plugin::Bind<Self>) -> reality::Result<reality::plugin::SpawnWork> {
-        if let Some(_target_repl) = bind
-            .plugin()?
-            .target
-            .as_ref()
-            .and_then(|t| t.item().attributes().get::<ReplInterface<T>>().map(|ri| (ri, t.clone())))
-        {
-            bind.defer(|_, _ct| async move {
-                // TODO: REPL loop here
-                // let (repl, target_bind) = _target_repl;
-                // let read = target_bind.handle().clone();
-                // read.spawn_blocking(|| async { 
-                //     let stdin = tokio::io::stdin();
-                //     todo!()
-                // }).await;
-                Ok(())
+        if let Some(_target_repl) = bind.plugin()?.target.as_ref().and_then(|t| {
+            t.item()
+                .attributes()
+                .get::<ReplInterface<T>>()
+                .map(|ri| (ri, t.clone()))
+        }) {
+            bind.defer(|_, ct| async move {
+                loop {
+                    let ct = ct.clone();
+                    // TODO: REPL loop here
+                    let (repl, target_bind) = _target_repl.clone();
+                    let read = target_bind.handle().clone();
+                    let read = read.spawn_blocking(move || async move {
+                        match BufReader::new(stdin()).lines().next_line().await {
+                            Ok(Some(line)) => {
+                                if let Some(args) = shlex::split(&line) {
+                                    let matches = repl.command.clone().get_matches_from(args);
+                                    let work = (repl.eval)(matches, &target_bind)?;
+                                    let work = work.await??;
+                                    work.await?;
+                                    Ok(true)
+                                } else {
+                                    Err(reality::Error::PluginCallCancelled)
+                                }
+                            }
+                            Ok(None) => Ok(false),
+                            Err(_) => Err(reality::Error::PluginCallCancelled),
+                        }
+                    });
+                    let result = with_cancel(ct)
+                        .run(async move { read.await?.await }, |r| match r {
+                            Ok(true) => Ok(()),
+                            _ => Err(reality::Error::PluginCallCancelled),
+                        })
+                        .await;
+
+                    if result.is_err() {
+                        return Ok(());
+                    }
+                }
             })
         } else {
             Err(reality::Error::PluginCallSkipped)
@@ -62,18 +88,21 @@ impl<T: Plugin> Content for Repl<T> {
 
 pub struct ReplInterface<T: Plugin> {
     command: clap::Command,
-    eval: fn(clap::ArgMatches, &Bind<T>) -> reality::Result<SpawnWork>
+    eval: fn(clap::ArgMatches, &Bind<T>) -> reality::Result<SpawnWork>,
 }
 
 impl<T: Plugin + ReplEval> ReplInterface<T> {
     /// Creates a new repl interface based on a type that implements the ReplEval trait
     #[inline]
     pub fn new() -> Self {
-        ReplInterface { command: T::command().multicall(true), eval: T::eval }
+        ReplInterface {
+            command: T::command().multicall(true),
+            eval: T::eval,
+        }
     }
 }
 
-pub trait ReplEval : Plugin {
+pub trait ReplEval: Plugin {
     /// Command that configures the repl
     fn command() -> clap::Command;
 
