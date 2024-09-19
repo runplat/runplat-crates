@@ -2,11 +2,10 @@ use crate::{repo::Journal, repr::Attributes, Resource};
 use std::{
     any::TypeId,
     pin::Pin,
-    sync::{Arc, RwLock},
-    time::Duration,
+    sync::{Arc, RwLock}
 };
 
-use super::ObservationEvent;
+use super::{observe::Observable, ObservationEvent};
 
 /// Type-alias for a resource cell which stores a resource for an item
 type ResourceCell = std::sync::Arc<std::sync::RwLock<PinnedResource<dyn Resource>>>;
@@ -55,6 +54,17 @@ impl Item {
             .expect("should always point to attributes")
     }
 
+    /// Creates an observable
+    pub fn observe(&self) -> Observable {
+        let mut inner = self.clone();
+        let event = ObservationEvent::new();
+        inner.observe = Some(event.clone());
+        Observable {
+            inner,
+            event,
+        }
+    }
+
     /// Borrows and casts a mutable reference for the inner resource
     ///
     /// Returns None if `T` does not match the stored resource
@@ -70,19 +80,6 @@ impl Item {
                 let inner = Pin::into_inner_unchecked(resource);
                 let cast = cast_mut_ref(inner).cast::<T>();
                 let cast = cast.as_mut();
-
-                if cast.is_some() {
-                    if let Some(obvs) = self.observe.take() {
-                        let sync = &*obvs.sync;
-                        let mut state = match sync.0.lock() {
-                            Ok(g) => g,
-                            Err(e) => e.into_inner(),
-                        };
-                        state.accessed = true;
-                        sync.1.notify_one();
-                        drop(state);
-                    }
-                }
                 cast
             }
         } else {
@@ -121,21 +118,6 @@ impl Item {
     #[inline]
     pub fn matches_type(&self, other: TypeId) -> bool {
         other == self.type_id
-    }
-
-    /// Observes access on the item
-    pub fn observe(&mut self) -> ObservationEvent {
-        let obvs = ObservationEvent::new();
-        self.observe = Some(obvs.clone());
-        obvs
-    }
-
-    /// Observes access on the item with a timeout
-    pub fn observe_with_timeout(&mut self, timeout: Duration) -> ObservationEvent {
-        let mut obvs = ObservationEvent::new();
-        obvs.timeout(timeout);
-        self.observe = Some(obvs.clone());
-        obvs
     }
 }
 
@@ -189,32 +171,42 @@ mod tests {
         let mut store = Store::new();
         let handle = store.put(String::from("HELLO WORLD")).commit();
 
-        let mut item = store.item(handle.commit()).unwrap().clone();
-        let observe = item.observe();
-        let mut cloned = item.clone();
+        let item = store.item(handle.commit()).unwrap().clone();
+        let mut observable = item.observe();
+        let mut observe = observable.event();
         let _ = std::thread::Builder::new().spawn(move || {
-            if let Some(item) = cloned.borrow_mut::<String>() {
-                item.extend(['t', 'e', 's', 't']);
-            }
+            observable.notify_start();
+            let item = observable.borrow_mut::<String>().expect("should be able to borrow");
+            item.extend(['t', 'e', 's', 't']);
+            observable.notify_change_with_message("change happend");
+            std::thread::sleep(Duration::from_secs(1));
+            observable.notify_change_with_progress(100);
         });
 
         std::thread::sleep(Duration::from_millis(100));
-        assert!(observe.wait());
+        let mut last_state = observe.wait();
+        while last_state.progress < 100 {
+            last_state = observe.wait();
+        }
         let item = item.borrow::<String>().expect("should exist");
         assert_eq!("HELLO WORLDtest", item);
+        assert_eq!("change happend", last_state.message);
+        assert_eq!(3, last_state.version);
     }
 
     #[test]
     fn test_item_borrow_resource_multi_thread_observe_timeout() {
         let mut store = Store::new();
         let handle = store.put(String::from("HELLO WORLD")).commit();
-
-        let mut item = store.item(handle.commit()).unwrap().clone();
-        let observe = item.observe_with_timeout(Duration::from_millis(100));
+        let item = store.item(handle.commit()).unwrap().clone();
+        let mut observe = item.observe();
+        let mut event = observe.event();
         let _ = std::thread::Builder::new().spawn(move || {
             std::thread::sleep(Duration::from_millis(200));
+            observe.borrow_mut::<String>().expect("should be able to borrow").extend(['b', 'a', 'd']);
         });
-        assert!(!observe.wait());
+        event.timeout(Duration::from_millis(100));
+        event.wait();
         let item = item.borrow::<String>().expect("should exist");
         assert_eq!("HELLO WORLD", item);
     }
