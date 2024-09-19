@@ -1,6 +1,6 @@
 use clap::{ArgMatches, FromArgMatches};
 use reality::{
-    plugin::{Address, Name},
+    plugin::{Address, Handler, Name},
     Content, Plugin, Repr, Resource, State,
 };
 use serde::de::DeserializeOwned;
@@ -78,6 +78,30 @@ impl Load {
         Self {
             name: P::name(),
             load: LoadBy::Toml(P::load_by_toml),
+        }
+    }
+
+    /// Creates a load handler resource for a plugin to load by cli arg matches
+    #[inline]
+    pub fn handler_by_args<H>() -> Self
+    where
+        H: Handler + FromArgMatches,
+    {
+        Self {
+            name: H::name(),
+            load: LoadBy::Args(H::load_handler_by_args),
+        }
+    }
+
+    /// Creates a load handler resource for a plugin to load by toml
+    #[inline]
+    pub fn handler_by_toml<H>() -> Self
+    where
+        H: Handler + DeserializeOwned,
+    {
+        Self {
+            name: H::name(),
+            load: LoadBy::Toml(H::load_handler_by_toml),
         }
     }
 

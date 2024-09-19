@@ -1,6 +1,6 @@
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
-use super::{Address, Call, Handler, Thunk};
+use super::{thunk::HandlerThunk, Address, Call, Handler, Thunk};
 use crate::{Error, Result};
 
 /// Intermediary for calling a plugin
@@ -54,6 +54,21 @@ impl Event {
             Err(Error::PluginMismatch)
         }
     }
+
+    /// Sets the handler on this event w/o generic typing
+    /// 
+    /// Returns an error if the handler's associated Target type does not match the current
+    /// event's plugin type
+    #[inline]
+    pub fn set_handler(&mut self, handler: &HandlerThunk) -> Result<&mut Self> {
+        if self.call.item.matches_type(handler.target_type()) {
+            self.handler = Some(handler.thunk());
+            Ok(self)
+        } else {
+            Err(Error::PluginMismatch)
+        }
+    }
+
 
     /// Consumes and starts the event
     #[inline]

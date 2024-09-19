@@ -2,13 +2,12 @@ mod config;
 pub use config::EngineConfig;
 pub use config::EventConfig;
 
-
-use std::{collections::BTreeSet, path::PathBuf};
-use clap::FromArgMatches;
-use serde::de::DeserializeOwned;
 use super::{Load, LoadInput};
 use crate::plugins::{Request, RequestArgs};
-use reality::{plugin::Name, repo::Handle, Content, Plugin, Repr, Resource, State, Uuid};
+use clap::FromArgMatches;
+use reality::{plugin::{Handler, Name}, repo::Handle, Content, Plugin, Repr, Resource, State, Uuid};
+use serde::de::DeserializeOwned;
+use std::{collections::BTreeSet, path::PathBuf};
 
 /// Type-alias for a function that creates an environment
 type CreateLoader = fn() -> EnvLoader;
@@ -87,6 +86,28 @@ impl EnvLoader {
     pub fn add_args_loader<P: Plugin + FromArgMatches>(&mut self) {
         let h = self.state.store_mut().put(Load::by_args::<P>()).commit();
         self.loaders.insert((P::name(), h));
+    }
+
+    /// Adds a handler toml loader to the env loader
+    #[inline]
+    pub fn add_handler_toml_loader<H: Handler + DeserializeOwned>(&mut self) {
+        let h = self
+            .state
+            .store_mut()
+            .put(Load::handler_by_toml::<H>())
+            .commit();
+        self.loaders.insert((H::name(), h));
+    }
+
+    /// Adds a handler arg loader to the env loader
+    #[inline]
+    pub fn add_handler_args_loader<H: Handler + FromArgMatches>(&mut self) {
+        let h = self
+            .state
+            .store_mut()
+            .put(Load::handler_by_args::<H>())
+            .commit();
+        self.loaders.insert((H::name(), h));
     }
 
     /// Finds a loader by name

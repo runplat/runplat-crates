@@ -1,3 +1,6 @@
+mod handler;
+pub use handler::HandlerThunk;
+
 use super::{Call, ForkFn, Handler, Name, Plugin, ThunkFn, Work};
 use crate::Result;
 use runir::{Content, Repr, Resource};

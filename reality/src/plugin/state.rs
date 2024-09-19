@@ -1,19 +1,12 @@
-use super::{Address, Name, Plugin};
-use crate::plugin::event::Event;
-use crate::Error;
+use super::{thunk::HandlerThunk, Address, Handler, Name, Plugin};
 use crate::{
-    plugin::{Call, Thunk},
-    Result,
+    plugin::{event::Event, Call, Thunk},
+    Error, Result,
 };
 use clap::ArgMatches;
-use runir::store::{Item, Put};
-use runir::Store;
-use runir::{repo::Handle, repr::Attributes};
+use runir::{repo::Handle, repr::Attributes, store::Item, Store};
 use serde::de::DeserializeOwned;
-use std::future::Future;
-use std::ops::Deref;
-use std::pin::Pin;
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{collections::BTreeMap, future::Future, ops::Deref, path::PathBuf, pin::Pin};
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
@@ -91,7 +84,10 @@ impl State {
         &mut self,
         matches: &ArgMatches,
     ) -> std::io::Result<Address> {
-        self.load_by_args_with(matches, |p: Put<'_, P>| p)
+        let plugin = P::from_arg_matches(matches)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()))?;
+
+        Ok(self.load(plugin))
     }
 
     /// Loads and registers a plugin from toml
@@ -100,51 +96,60 @@ impl State {
         &mut self,
         toml: &str,
     ) -> std::io::Result<Address> {
-        self.load_by_toml_with(toml, |p: Put<'_, P>| p)
+        let plugin = toml::from_str::<P>(toml)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.message()))?;
+        Ok(self.load(plugin))
     }
 
     /// Registers a plugin w/ the the current state
     #[inline]
     pub fn load<P: Plugin>(&mut self, plugin: P) -> Address {
-        self.load_with(plugin, |p: Put<'_, P>| p)
+        use crate::plugin::MustLoad;
+        let name = P::name();
+        let put = self.store.put(plugin);
+        let handle = P::load(P::must_load(put)).commit();
+        self.plugins.insert(name.path().clone(), handle.clone());
+        self.plugins.insert(
+            name.path().join(hex::encode(handle.commit().to_be_bytes())),
+            handle.clone(),
+        );
+
+        Address {
+            name,
+            commit: handle.commit(),
+        }
     }
 
     /// Registers a plugin from parsing cli arg matches
     #[inline]
-    pub fn load_by_args_with<P: Plugin + clap::FromArgMatches>(
+    pub fn load_handler_by_args<H: Handler + clap::FromArgMatches>(
         &mut self,
         matches: &ArgMatches,
-        extend: impl Fn(runir::store::Put<'_, P>) -> runir::store::Put<'_, P>,
     ) -> std::io::Result<Address> {
-        let plugin = P::from_arg_matches(matches)
+        let plugin = H::from_arg_matches(matches)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()))?;
 
-        Ok(self.load_with(plugin, extend))
+        Ok(self.load_handler(plugin))
     }
 
     /// Loads and registers a plugin from toml
     #[inline]
-    pub fn load_by_toml_with<P: Plugin + DeserializeOwned>(
+    pub fn load_handler_by_toml<H: Handler + DeserializeOwned>(
         &mut self,
         toml: &str,
-        extend: impl Fn(runir::store::Put<'_, P>) -> runir::store::Put<'_, P>,
     ) -> std::io::Result<Address> {
-        let plugin = toml::from_str::<P>(toml)
+        let plugin = toml::from_str::<H>(toml)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.message()))?;
-        Ok(self.load_with(plugin, extend))
+        Ok(self.load_handler(plugin))
     }
 
     /// Registers a plugin w/ the the current state
     #[inline]
-    pub fn load_with<P: Plugin>(
-        &mut self,
-        plugin: P,
-        extend: impl Fn(runir::store::Put<'_, P>) -> runir::store::Put<'_, P>,
-    ) -> Address {
-        use crate::plugin::MustLoad;
-        let name = P::name();
+    pub fn load_handler<H: Handler>(&mut self, plugin: H) -> Address {
+        use crate::plugin::MustLoadHandler;
+        let name = H::name();
         let put = self.store.put(plugin);
-        let handle = extend(P::load(P::must_load(put))).commit();
+        let handle = H::load(H::must_load(put)).commit();
         self.plugins.insert(name.path().clone(), handle.clone());
         self.plugins.insert(
             name.path().join(hex::encode(handle.commit().to_be_bytes())),
@@ -222,6 +227,20 @@ impl State {
                     handler: None,
                 })
             }
+            None => Err(Error::PluginNotFound),
+        }
+    }
+
+    /// Find and returns a handler thunk from a plugin path
+    #[inline]
+    pub fn handler(&self, plugin: impl Into<PathBuf>) -> Result<HandlerThunk> {
+        let path = plugin.into();
+        match self
+            .plugins
+            .get(&path)
+            .and_then(|h| h.cast::<Attributes>().and_then(|a| a.get::<HandlerThunk>()))
+        {
+            Some(h) => Ok(h.deref().clone()),
             None => Err(Error::PluginNotFound),
         }
     }

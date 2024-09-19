@@ -1,6 +1,8 @@
+use clap::{ArgMatches, FromArgMatches};
+use serde::de::DeserializeOwned;
 use tracing::debug;
 
-use super::{Bind, Call, Plugin, SpawnWork};
+use super::{Address, Bind, Call, Plugin, SpawnWork, State};
 use crate::Result;
 
 /// Trait for a plugin that can be called to handle some input plugin
@@ -58,5 +60,23 @@ pub trait Handler: Plugin {
                 Ok(work)
             }
         }
+    }
+
+    /// Loads this plugin by toml
+    #[inline]
+    fn load_handler_by_toml(state: &mut State, toml: &str) -> std::io::Result<Address>
+    where
+        Self: DeserializeOwned,
+    {
+        state.load_handler_by_toml::<Self>(toml)
+    }
+
+    /// Loads this plugin by cli args
+    #[inline]
+    fn load_handler_by_args(state: &mut State, args: &ArgMatches) -> std::io::Result<Address>
+    where
+        Self: FromArgMatches,
+    {
+        state.load_handler_by_args::<Self>(args)
     }
 }

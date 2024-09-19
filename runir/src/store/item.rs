@@ -114,7 +114,13 @@ impl Item {
     /// Returns true if this item matches the resource
     #[inline]
     pub fn is_type<T: Resource>(&self) -> bool {
-        std::any::TypeId::of::<T>() == self.type_id
+        self.matches_type(std::any::TypeId::of::<T>())
+    }
+
+    /// Returns true if the a type id matches the current type id this item hosts
+    #[inline]
+    pub fn matches_type(&self, other: TypeId) -> bool {
+        other == self.type_id
     }
 
     /// Observes access on the item

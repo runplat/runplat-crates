@@ -1,30 +1,28 @@
 mod address;
 mod call;
-mod handler;
 mod event;
+mod handler;
 mod state;
 mod thunk;
 mod work;
 
 pub mod name;
-pub use handler::Handler;
 pub use address::Address;
 pub use call::Bind;
 pub use call::Call;
-use clap::ArgMatches;
-use clap::FromArgMatches;
 pub use event::Event;
+pub use handler::Handler;
 pub use name::Name;
-use runir::store::Item;
-use runir::Content;
-use semver::Version;
-use serde::de::DeserializeOwned;
 pub use state::State;
+pub use thunk::HandlerThunk;
 pub use thunk::Thunk;
 pub use work::Work;
 
+use runir::{store::Item, Content, Resource};
+use semver::Version;
+use serde::de::DeserializeOwned;
+use clap::{ArgMatches, FromArgMatches};
 use crate::Result;
-use runir::Resource;
 
 /// Type-alias for a join handle that spawns plugin work
 pub type SpawnWork = tokio::task::JoinHandle<Result<Work>>;
@@ -73,10 +71,10 @@ pub trait Plugin: Resource + Content + Sized {
     }
 
     /// Forks the item
-    /// 
+    ///
     /// ## Guidance
     /// Can be overriden to customize how forking is applied to the inner item.
-    /// 
+    ///
     /// A plugin can be forked from either a `Call` or `Event` struct
     #[inline]
     fn fork(item: &Item) -> Item {
@@ -115,4 +113,18 @@ pub(crate) trait MustLoad: Plugin {
     }
 }
 
+/// Trait to centralize attributes that must be loaded with a plugin
+pub(crate) trait MustLoadHandler: Handler {
+    /// Invoked when this plugin is loaded into state
+    ///
+    /// Loads critical attributes to this plugin, but can be overriden by the plugin
+    #[inline]
+    fn must_load(put: runir::store::Put<'_, Self>) -> runir::store::Put<'_, Self> {
+        put.attr(Thunk::new::<Self>())
+            .attr(HandlerThunk::new::<Self>())
+            .attr(Self::name())
+    }
+}
+
 impl<P: Plugin> MustLoad for P {}
+impl<P: Handler> MustLoadHandler for P {}
