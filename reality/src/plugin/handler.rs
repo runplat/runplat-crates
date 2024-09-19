@@ -2,7 +2,7 @@ use clap::{ArgMatches, FromArgMatches};
 use serde::de::DeserializeOwned;
 use tracing::debug;
 
-use super::{Address, Bind, Call, Plugin, SpawnWork, State};
+use super::{Address, Bind, Call, Plugin, State, Work};
 use crate::Result;
 
 /// Trait for a plugin that can be called to handle some input plugin
@@ -17,7 +17,7 @@ pub trait Handler: Plugin {
 
     /// Thunk function that wraps another thunk function in order to sequence the handler to execute
     /// after the call of the plugin it is handling
-    fn wrap_thunk(call: Call) -> Result<SpawnWork> {
+    fn wrap_thunk(call: Call) -> Result<Work> {
         // Receives the original call to plugin R and initiates the work
         let work = Self::Target::thunk(call.clone())?;
         // Finds the resource of the handler
@@ -35,9 +35,7 @@ pub trait Handler: Plugin {
                 binding.defer(|b, _| async move {
                     debug!("Waiting for target plugin to complete work");
                     // Wait for the original plugin to complete
-                    let w = work.await??;
-                    w.await?;
-
+                    work.await?;
                     // Rebind the other plugin
                     let other = call.bind::<Self::Target>()?;
 
@@ -45,9 +43,7 @@ pub trait Handler: Plugin {
                     match Self::handle(other, b.clone()) {
                         Ok(_) => {
                             debug!("Calling handler");
-                            let completion = Self::call(b)?;
-                            let handler_work = completion.await??;
-                            handler_work.await
+                            Self::call(b)?.await
                         }
                         Err(_) => {
                             debug!("Skipping handler");

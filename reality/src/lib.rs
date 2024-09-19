@@ -11,6 +11,7 @@ pub mod plugin;
 pub use plugin::Plugin;
 pub use plugin::State;
 
+use plugin::Work;
 /// Re-export runir since it will be required for extending reality
 pub use runir;
 pub use runir::*;
@@ -24,6 +25,9 @@ pub use uuid::Uuid;
 use plugin::Name;
 use serde::Serialize;
 
+/// Type-alias for spawning work
+pub type CallResult = Result<Work>;
+
 /// Type-alias for this crates main result type
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -32,6 +36,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     /// Error when a join handle can not run to completion, analagous to tokio::runtime::JoinError
     TaskError { is_panic: bool, is_cancel: bool },
+    /// Error when a join handle can not run to completion, analagous to tokio::runtime::JoinError
+    IOError { message: String },
     /// Error returned when a plugin could not be loaded from a path
     LoadPluginError,
     /// Error returned when a `Name` could not be parsed
@@ -67,6 +73,12 @@ impl From<tokio::task::JoinError> for Error {
     }
 }
 
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Self::IOError { message: e.to_string() }
+    }
+}
+
 pub struct BincodeContent {
     state_uuid: Uuid,
 }
@@ -99,7 +111,7 @@ impl runir::Content for BincodeContent {
 #[cfg(test)]
 pub(crate) mod tests {
     use crate::*;
-    use plugin::{Bind, Call, Handler, Plugin, State};
+    use plugin::{Bind, Call, Handler, Plugin, State, Work};
     use runir::Resource;
     use semver::Version;
     use serde::{Deserialize, Serialize};
@@ -123,7 +135,7 @@ pub(crate) mod tests {
     }
 
     impl Plugin for TomlPlugin {
-        fn call(_: Bind<Self>) -> Result<plugin::SpawnWork> {
+        fn call(_: Bind<Self>) -> Result<plugin::Work> {
             Err(Error::PluginCallSkipped)
         }
 
@@ -431,7 +443,7 @@ pub(crate) mod tests {
 
     impl Resource for NotTestPlugin {}
     impl Plugin for NotTestPlugin {
-        fn call(_: Bind<Self>) -> Result<plugin::SpawnWork> {
+        fn call(_: Bind<Self>) -> Result<plugin::Work> {
             todo!()
         }
 
@@ -458,8 +470,10 @@ pub(crate) mod tests {
         }
     }
     impl Plugin for TestPluginHandler {
-        fn call(bind: Bind<Self>) -> Result<plugin::SpawnWork> {
-            Ok(bind.work(|_, _| async { Ok(()) }))
+        fn call(bind: Bind<Self>) -> Result<plugin::Work> {
+            bind.work(|_, _| async {
+                Ok(())
+            })
         }
         fn version() -> Version {
             Version::new(0, 1, 0)
@@ -488,25 +502,25 @@ pub(crate) mod tests {
     impl Resource for TestPlugin {}
 
     impl Plugin for TestPlugin {
-        fn call(bind: Bind<Self>) -> Result<plugin::SpawnWork> {
+        fn call(bind: Bind<Self>) -> Result<Work> {
             let plugin = bind.plugin()?;
 
             if plugin.skip {
                 Err(Error::PluginCallSkipped)
             } else if plugin.call_mut {
-                Ok(bind.work_mut(|test, _| {
+                bind.work_mut(|test, _| {
                     let _ = test.called.set(true);
                     test.call_mut = false;
                     async move {
                         tokio::time::sleep(Duration::from_secs(1)).await;
                         Ok(())
                     }
-                }))
+                })
             } else {
-                Ok(bind.work(|test, _| {
+                bind.work(|test, _| {
                     let _ = test.called.set(true);
                     async move { Ok(()) }
-                }))
+                })
             }
         }
 

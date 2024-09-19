@@ -74,12 +74,10 @@ impl Event {
     #[inline]
     pub async fn start(self) -> Result<()> {
         if let Some(handler) = self.handler {
-            let work = handler.exec(self.call).await?;
-            work.await
+            handler.exec(self.call).await
         } else {
             debug!(address = self.address().to_string(), "event_start");
-            let work = self.thunk.exec(self.call).await?;
-            work.await
+            self.thunk.exec(self.call).await
         }
     }
 }

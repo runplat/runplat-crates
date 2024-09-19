@@ -3,7 +3,7 @@ use clap::Args;
 use http_body_util::combinators::BoxBody;
 use hyper::{body::Incoming, header, Response};
 use hyper_util::rt::{TokioExecutor, TokioIo};
-use reality::{plugin::Bind, BincodeContent, Content, Plugin, Resource, Uuid, Version};
+use reality::{plugin::Bind, BincodeContent, CallResult, Content, Plugin, Resource, Uuid, Version};
 use serde::{Deserialize, Serialize};
 use std::{future::Future, path::PathBuf, pin::Pin, sync::OnceLock, task::Poll};
 use tokio::{net::TcpStream, select};
@@ -80,7 +80,7 @@ pub struct RequestArgs {
 }
 
 impl Plugin for RequestArgs {
-    fn call(bind: Bind<Self>) -> reality::Result<reality::plugin::SpawnWork> {
+    fn call(bind: Bind<Self>) -> CallResult {
         let plugin = bind.plugin()?;
         if plugin.request.is_none() {
             bind.skip()
@@ -109,26 +109,6 @@ impl Plugin for RequestArgs {
                             },
                         }
                     }).await
-                    // select! {
-                    //     resp = req_fut => {
-                    //         match resp {
-                    //             Ok(resp) => {
-                    //                 if req.response.is_some() {
-                    //                     Err(binding.plugin_call_error("Response was already set and has not been handled"))
-                    //                 } else {
-                    //                     req.response = Some(resp);
-                    //                     Ok(())
-                    //                 }
-                    //             },
-                    //             Err(err) => {
-                    //                 Err(binding.plugin_call_error(err.to_string()))
-                    //             },
-                    //         }
-                    //     },
-                    //     _ = ct_fut => {
-                    //         Err(binding.plugin_call_cancelled())
-                    //     }
-                    // }
                 } else {
                     Err(binding.plugin_call_error("Request was not loaded"))
                 }
@@ -237,7 +217,7 @@ pub struct StringBody(String);
 pub struct EmptyBody;
 
 impl Plugin for Request {
-    fn call(binding: reality::plugin::Bind<Self>) -> reality::Result<reality::plugin::SpawnWork> {
+    fn call(binding: reality::plugin::Bind<Self>) -> CallResult {
         let plugin = binding.plugin()?;
         if plugin.response.is_some() {
             debug!("Skipping request, response has not been removed");

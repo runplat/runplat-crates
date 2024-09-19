@@ -22,13 +22,10 @@ use runir::{store::Item, Content, Resource};
 use semver::Version;
 use serde::de::DeserializeOwned;
 use clap::{ArgMatches, FromArgMatches};
-use crate::Result;
-
-/// Type-alias for a join handle that spawns plugin work
-pub type SpawnWork = tokio::task::JoinHandle<Result<Work>>;
+use crate::CallResult;
 
 /// Type-alias for the a thunk function
-pub type ThunkFn = fn(Call) -> Result<SpawnWork>;
+pub type ThunkFn = fn(Call) -> CallResult;
 
 /// Type-alias for forking an item
 pub type ForkFn = fn(&Item) -> Item;
@@ -36,7 +33,7 @@ pub type ForkFn = fn(&Item) -> Item;
 /// Plugin trait for implementing extensions within the reality framework
 pub trait Plugin: Resource + Content + Sized {
     /// Invoked when the thunk assigned to this plugin successfully binds a call to the plugin
-    fn call(bind: Bind<Self>) -> Result<SpawnWork>;
+    fn call(bind: Bind<Self>) -> CallResult;
 
     /// Plugin version
     ///
@@ -47,7 +44,7 @@ pub trait Plugin: Resource + Content + Sized {
     ///
     /// Returns an error if the call cannot be bound to this plugin, or if the underlying plugin call returns an error
     #[inline]
-    fn thunk(call: Call) -> Result<SpawnWork> {
+    fn thunk(call: Call) -> CallResult {
         let bind = call.bind::<Self>()?;
         Self::call(bind)
     }

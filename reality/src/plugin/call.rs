@@ -17,7 +17,7 @@ use crate::Result;
 /// Serves as the context when a plugin is called
 #[derive(Clone)]
 pub struct Call {
-    /// 
+    ///
     pub(crate) state: State,
     /// Resource associated to this call
     pub(crate) item: Item,
@@ -47,7 +47,7 @@ impl Call {
     }
 
     /// Creates a fork of this call
-    /// 
+    ///
     /// Will call `fork(item)` as well as create a child token for the inner cancel token
     #[inline]
     pub fn fork(&self) -> Call {
@@ -62,11 +62,11 @@ impl Call {
 }
 
 /// Represents the binding between a plugin and it's associated Call
-/// 
+///
 /// Main entrypoint for all plugins when they are invoked
 pub struct Bind<P: Plugin> {
     /// Call this binding is associated to
-    /// 
+    ///
     /// Before a binding is created, the association is verified
     pub(crate) call: Call,
     /// Type this binding is bound to
@@ -113,21 +113,20 @@ impl<P: Plugin> Bind<P> {
     pub fn defer<F>(
         self,
         exec: impl FnOnce(Bind<P>, CancellationToken) -> F + Send + 'static,
-    ) -> Result<tokio::task::JoinHandle<Result<Work>>>
+    ) -> Result<Work>
     where
         F: Future<Output = Result<()>> + Send + 'static,
     {
-        let handle = self.call.handle.clone();
-        let cancel = self.call.cancel.clone();
         let binding = self.clone();
-
-        // Technically should not block
-        Ok(handle.clone().spawn_blocking(move || {
-            Ok(Work {
-                task: handle.spawn(exec(binding, cancel.clone())),
-                cancel,
-            })
-        }))
+        let handle = self.call.handle.clone();
+        let cancel_clone = self.call.cancel.clone();
+        let cancel = self.call.cancel;
+        Ok(Work {
+            task: handle.clone().spawn(async move {
+                exec(binding, cancel_clone).await
+            }),
+            cancel,
+        })
     }
 
     /// Consumes the call context and spawns returns work w/ mutable access to the plugin,
@@ -135,22 +134,21 @@ impl<P: Plugin> Bind<P> {
     /// Returns a join handle which will return work representing the running background task
     #[inline]
     pub fn work_mut<F>(
-        mut self,
+        self,
         exec: impl FnOnce(&mut P, CancellationToken) -> F + Send + 'static,
-    ) -> tokio::task::JoinHandle<Result<Work>>
+    ) -> Result<Work>
     where
         F: Future<Output = Result<()>> + Send + 'static,
     {
+        let mut call = self.clone();
         let handle = self.call.handle.clone();
-        let cancel = self.call.cancel.clone();
-
-        // Since getting access to the plugin can block, execute on the blocking thread pool
-        handle.clone().spawn_blocking(move || {
-            let plugin = self.plugin_mut()?;
-            Ok(Work {
-                task: handle.spawn(exec(plugin, cancel.clone())),
-                cancel,
-            })
+        let cancel_clone = self.call.cancel.clone();
+        let cancel = self.call.cancel;
+        Ok(Work {
+            task: handle.clone().spawn(async move {
+                exec(call.plugin_mut()?, cancel_clone).await
+            }),
+            cancel,
         })
     }
 
@@ -161,26 +159,25 @@ impl<P: Plugin> Bind<P> {
     pub fn work<F>(
         self,
         exec: impl FnOnce(&P, CancellationToken) -> F + Send + 'static,
-    ) -> tokio::task::JoinHandle<Result<Work>>
+    ) -> Result<Work>
     where
         F: Future<Output = Result<()>> + Send + 'static,
     {
+        let call = self.clone();
         let handle = self.call.handle.clone();
-        let cancel = self.call.cancel.clone();
-        // Since getting access to the plugin can block, execute on the blocking thread pool
-        handle.clone().spawn_blocking(move || {
-            let call = self.clone();
-            let task = exec(call.plugin()?, cancel.clone());
-            Ok(Work {
-                task: handle.spawn(task),
-                cancel,
-            })
+        let cancel_clone = self.call.cancel.clone();
+        let cancel = self.call.cancel;
+        Ok(Work {
+            task: handle.clone().spawn(async move {
+                exec(call.plugin()?, cancel_clone).await
+            }),
+            cancel,
         })
     }
 
     /// Convenience helper for calling returns `Err(Error::PluginCallSkipped)`
     #[inline]
-    pub fn skip(self) -> crate::Result<crate::plugin::SpawnWork> {
+    pub fn skip(self) -> crate::Result<Work> {
         Err(Error::PluginCallSkipped)
     }
 

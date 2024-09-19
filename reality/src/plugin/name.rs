@@ -309,7 +309,7 @@ mod tests {
         }
     }
     impl Plugin for Test {
-        fn call(_: crate::plugin::Bind<Self>) -> crate::Result<crate::plugin::SpawnWork> {
+        fn call(_: crate::plugin::Bind<Self>) -> crate::Result<crate::plugin::Work> {
             todo!()
         }
 

@@ -1,7 +1,7 @@
 mod handler;
 pub use handler::HandlerThunk;
 
-use super::{Call, ForkFn, Handler, Name, Plugin, ThunkFn, Work};
+use super::{Call, ForkFn, Handler, Name, Plugin, ThunkFn};
 use crate::Result;
 use runir::{Content, Repr, Resource};
 
@@ -54,8 +54,8 @@ impl Thunk {
     /// Executes the thunk
     #[inline]
     #[must_use = "If the future is not awaited, then the call cannot be executed"]
-    pub async fn exec(&self, call: Call) -> Result<Work> {
-        (self.thunk)(call)?.await?
+    pub async fn exec(&self, call: Call) -> Result<()> {
+        (self.thunk)(call)?.await
     }
 }
 
