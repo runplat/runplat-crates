@@ -24,6 +24,9 @@ pub struct State {
     handle: tokio::runtime::Handle,
     /// Map of registered plugins
     plugins: BTreeMap<PathBuf, Handle>,
+    /// If set to true, will return an error if a plugin being loaded
+    /// will overwrite an existing plugin
+    disallow_commit_conflicts: bool,
 }
 
 impl State {
@@ -37,6 +40,7 @@ impl State {
             cancel: CancellationToken::new(),
             handle: tokio::runtime::Handle::current(),
             plugins: BTreeMap::new(),
+            disallow_commit_conflicts: false
         }
     }
 
@@ -48,6 +52,7 @@ impl State {
             cancel: CancellationToken::new(),
             handle,
             plugins: BTreeMap::new(),
+            disallow_commit_conflicts: false
         }
     }
 
@@ -58,6 +63,12 @@ impl State {
     #[must_use]
     pub async fn init() -> Self {
         Self::new()
+    }
+
+    /// If set to true, will return an error if a plugin being loaded would overwrite an existing plugin commit
+    #[inline]
+    pub fn disallow_commit_conflicts(&mut self, disallow: bool) {
+        self.disallow_commit_conflicts = disallow;
     }
 
     /// Returns a reference to the inner store
@@ -106,13 +117,18 @@ impl State {
     pub fn load<P: Plugin>(&mut self, plugin: P) -> Address {
         use crate::plugin::MustLoad;
         let name = P::name();
+
+        // TODO: Might want to refactor this to return a Load builder
         let put = self.store.put(plugin);
         let handle = P::load(P::must_load(put)).commit();
+        let address = name.path().join(hex::encode(handle.commit().to_be_bytes()));
         self.plugins.insert(name.path().clone(), handle.clone());
-        self.plugins.insert(
-            name.path().join(hex::encode(handle.commit().to_be_bytes())),
+        if let Some(_) = self.plugins.insert(
+            address,
             handle.clone(),
-        );
+        ).filter(|_| self.disallow_commit_conflicts) {
+            todo!("Commit conflicts disallowed")
+        }
 
         Address {
             name,

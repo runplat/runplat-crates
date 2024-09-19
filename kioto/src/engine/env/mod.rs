@@ -1,8 +1,9 @@
 mod config;
 pub use config::EngineConfig;
 pub use config::EventConfig;
-use reality::plugin::Event;
+pub use config::Metadata;
 
+use reality::plugin::Event;
 use super::{Load, LoadInput};
 use crate::plugins::{Request, RequestArgs};
 use clap::FromArgMatches;
@@ -227,8 +228,7 @@ mod tests {
 url = "https://jsonplaceholder.typicode.com/posts"
         "#,
             )
-            .unwrap()
-            .as_table(),
+            .unwrap(),
         );
 
         let loaded = loaded.expect("should be able to load");

@@ -53,7 +53,7 @@ fn load_toml(event: &str, name: Name, path: &PathBuf, loader: &mut EnvLoader) ->
                     let mut settings = toml_edit::DocumentMut::from_str(&toml).unwrap();
 
                     // Insert a metadata table w/ information on the source being loaded
-                    let mut metadata = toml_edit::Table::new();
+                    let mut metadata = toml_edit::table();
                     metadata["src"] = value(path.to_string_lossy().to_string());
                     metadata["src-size"] = value(size as i64);
                     metadata["event"] = value(event);
@@ -63,9 +63,9 @@ fn load_toml(event: &str, name: Name, path: &PathBuf, loader: &mut EnvLoader) ->
 
                     // **Note**: Store in a field that isn't a native rust field, however
                     // callers can opt in to deserialize if they wish
-                    settings["_kt-meta"] = toml_edit::Item::Table(metadata.into());
+                    settings["_kt-meta"] = metadata;
                     
-                    Ok(loader.load(&name, settings.as_table()).unwrap())
+                    Ok(loader.load(&name, settings).unwrap())
                 }
                 Err(io) => Err(Errors::PluginLoadError(
                     PluginLoadErrors::CouldNotReadFile {

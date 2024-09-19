@@ -3,6 +3,8 @@ mod load;
 mod sequence;
 pub use env::Env;
 pub use env::EnvLoader;
+pub use env::Metadata;
+pub use env::EngineConfig;
 pub use env::EventConfig;
 pub use load::Load;
 pub use load::LoadBy;
@@ -101,7 +103,7 @@ mod tests {
             })
             .unwrap();
         assert_eq!(
-            "kioto/0.1.0/plugins/request/b71c8b87cf79b5e2",
+            "kioto/0.1.0/plugins/request/ae0c7d11e7600c0b",
             event.address().to_string()
         );
 
@@ -112,7 +114,7 @@ mod tests {
             })
             .unwrap();
         assert_eq!(
-            "kioto/0.1.0/plugins/request/f2be9205a4ec01c7",
+            "kioto/0.1.0/plugins/request/1b3703c820ff228c",
             event.address().to_string()
         );
     }

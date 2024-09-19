@@ -118,8 +118,8 @@ impl From<ArgMatches> for LoadInput {
     }
 }
 
-impl<'l> From<&'l toml_edit::Table> for LoadInput {
-    fn from(value: &'l toml_edit::Table) -> Self {
+impl<'l> From<toml_edit::DocumentMut> for LoadInput {
+    fn from(value: toml_edit::DocumentMut) -> Self {
         LoadInput::Toml(value.to_string())
     }
 }

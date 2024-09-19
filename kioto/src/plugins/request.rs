@@ -10,6 +10,8 @@ use tokio::{net::TcpStream, select};
 use tracing::{debug, error, trace, warn};
 use url::Url;
 
+use crate::engine::Metadata;
+
 /// Type-alias for the default result type returned by this plugin's plumbing
 type Result<T> = std::io::Result<T>;
 
@@ -203,8 +205,8 @@ pub struct Request {
     /// Response this request received
     #[serde(skip)]
     response: Option<Response<Incoming>>,
-    #[serde(default, rename = "_kt-meta")]
-    _meta: BTreeMap<String, String>,
+    #[serde(rename = "_kt-meta")]
+    _meta: Option<Metadata>,
 }
 
 /// Bytes Body
@@ -276,7 +278,7 @@ impl Request {
             method: None,
             headers: vec![],
             response: None,
-            _meta: BTreeMap::new(),
+            _meta: None,
         }
     }
 

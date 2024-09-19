@@ -20,7 +20,9 @@ pub enum Errors {
 
 #[derive(Debug)]
 pub enum PluginLoadErrors {
+    /// Error returned when a src file is missing
     MissingFile(CouldNotLoadPlugin),
+    /// Error returned when a file could not be loaded
     CouldNotReadFile {
         error: CouldNotLoadPlugin,
         io: std::io::Error,
