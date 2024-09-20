@@ -734,7 +734,9 @@ headers = [
         let req = test_mock_request_args([
             "testparser",
             "test",
+            "--url",
             "https://jsonplaceholder.typicode.com/posts",
+            "run"
         ]);
         assert_eq!(
             "https://jsonplaceholder.typicode.com/posts",
@@ -755,7 +757,9 @@ headers = [
             "testparser",
             "test",
             "--put",
+            "--url",
             "https://jsonplaceholder.typicode.com/posts",
+            "run"
         ]);
         assert_eq!(
             "https://jsonplaceholder.typicode.com/posts",
@@ -776,7 +780,9 @@ headers = [
             "testparser",
             "test",
             "--post",
+            "--url",
             "https://jsonplaceholder.typicode.com/posts",
+            "run"
         ]);
         assert_eq!(
             "https://jsonplaceholder.typicode.com/posts",
@@ -797,7 +803,9 @@ headers = [
             "testparser",
             "test",
             "--delete",
+            "--url",
             "https://jsonplaceholder.typicode.com/posts",
+            "run"
         ]);
         assert_eq!(
             "https://jsonplaceholder.typicode.com/posts",
@@ -818,7 +826,9 @@ headers = [
             "testparser",
             "test",
             "--patch",
+            "--url",
             "https://jsonplaceholder.typicode.com/posts",
+            "run"
         ]);
         assert_eq!(
             "https://jsonplaceholder.typicode.com/posts",
@@ -842,7 +852,9 @@ headers = [
             "-H 'Accept=application/json; charset=UTF-8'",
             "-H 'Accept=application/json2'",
             "-H 'x-ms-Custom=test'",
+            "--url",
             "https://jsonplaceholder.typicode.com/posts",
+            "run"
         ]);
         assert_eq!(
             "https://jsonplaceholder.typicode.com/posts",

@@ -40,11 +40,8 @@ impl Config {
     #[inline]
     pub fn from_file_system(root: impl Into<PathBuf>, name: &str) -> std::io::Result<Self> {
         let root = root.into();
-
         let config = root.join(name).join("config.toml");
-
         let config = std::fs::read_to_string(config)?;
-
         toml::from_str(&config)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.message()))
     }

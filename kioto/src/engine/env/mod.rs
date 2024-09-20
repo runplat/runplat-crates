@@ -4,6 +4,7 @@ pub use config::EventConfig;
 pub use config::Metadata;
 
 use reality::plugin::Event;
+use super::Operation;
 use super::{Load, LoadInput};
 use crate::plugins::{Request, RequestArgs};
 use clap::FromArgMatches;
@@ -16,7 +17,7 @@ use serde::de::DeserializeOwned;
 use std::{collections::BTreeSet, path::PathBuf};
 
 /// Type-alias for a function that creates an environment
-type CreateLoader = fn() -> EnvLoader;
+type CreateLoader = fn(String, PathBuf) -> EnvLoader;
 
 /// Struct containing tools for creating a new environment
 /// 
@@ -45,20 +46,15 @@ impl Env {
     /// The EnvLoader can then be used to load events from event configurations
     #[inline]
     pub fn env_loader(&self, root: impl Into<PathBuf>) -> std::io::Result<EnvLoader> {
-        let mut config = EngineConfig::from_file_system(root, &self.label)?;
-        let mut loader = self.loader();
+        let root = root.into();
+        let mut config = EngineConfig::from_file_system(root.clone(), &self.label)?;
+        let mut loader = (self.create_loader)(self.label.to_string(), root);
         config
             .load(&mut loader)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, format!("{e:?}")))?;
         loader.config = config;
         loader.label = self.label.clone();
         Ok(loader)
-    }
-
-    /// Creates a new env loader
-    #[inline]
-    fn loader(&self) -> EnvLoader {
-        (self.create_loader)()
     }
 }
 
@@ -172,14 +168,15 @@ impl EnvLoader {
 }
 
 /// Creates an env w/ default set of plugins
-pub fn default_env() -> EnvLoader {
+pub fn default_env(label: String, root_dir: PathBuf) -> EnvLoader {
     let mut loader = EnvLoader {
-        label: String::from("default"),
-        root_dir: PathBuf::from(".kt").join("default"),
+        label,
+        root_dir,
         state: State::new(),
         config: EngineConfig::default(),
         loaders: BTreeSet::new(),
     };
+    loader.add_toml_loader::<Operation>();
     loader.add_toml_loader::<Request>();
     loader.add_args_loader::<RequestArgs>();
     loader
@@ -199,14 +196,15 @@ macro_rules! test_env {
             }
 
             /// Creates an env w/ default set of plugins
-            fn test_env() -> EnvLoader {
+            fn test_env(label: String, root_dir: std::path::PathBuf) -> EnvLoader {
                 let mut loader = EnvLoader {
-                    label: String::from(stringify!($name)),
-                    root_dir: std::path::PathBuf::from(".test").join(stringify!($name)),
+                    label,
+                    root_dir,
                     state: State::new(),
                     config: EngineConfig::default(),
                     loaders: std::collections::BTreeSet::new(),
                 };
+                loader.add_toml_loader::<crate::engine::Operation>();
                 loader.add_toml_loader::<crate::plugins::Request>();
                 loader.add_args_loader::<crate::plugins::RequestArgs>();
                 loader
@@ -225,7 +223,7 @@ mod tests {
     async fn test_test_env_macro() {
         let env = macro_test::env();
 
-        let mut loader = env.loader();
+        let mut loader = env.env_loader(PathBuf::from(".test")).unwrap();
         let loaded = loader.load(
             &crate::plugins::Request::name(),
             toml_edit::DocumentMut::from_str(

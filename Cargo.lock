@@ -496,6 +496,7 @@ dependencies = [
  "toml",
  "toml_edit",
  "tracing",
+ "tracing-test",
  "url",
 ]
 

@@ -1,9 +1,11 @@
+use runir::store::Item;
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
 use super::{thunk::HandlerThunk, Address, Call, Handler, Thunk};
 use crate::{Error, Result};
 
 /// Intermediary for calling a plugin
+#[derive(Clone)]
 pub struct Event {
     /// Resolved plugin address that created this event
     pub(crate) address: Address,
@@ -79,5 +81,11 @@ impl Event {
             debug!(address = self.address().to_string(), "event_start");
             self.thunk.exec(self.call).await
         }
+    }
+
+    /// Returns the resource for this event
+    #[inline]
+    pub fn item(&self) -> &Item {
+        &self.call.item
     }
 }

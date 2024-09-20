@@ -1,0 +1,8 @@
+[plugins.run_tests]
+plugin = "kioto/engine.operation@0.1.0"
+
+[plugins.test]
+plugin = "kioto/plugins.request@0.1.0"
+
+[plugins.test2]
+plugin = "kioto/plugins.request@0.1.0"

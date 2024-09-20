@@ -34,6 +34,7 @@ impl Config {
         } else {
             let path = loader
                 .root_dir
+                .join(loader.label.clone())
                 .join("etc")
                 .join(name.path())
                 .join(format!("{event}.toml"));
@@ -54,6 +55,7 @@ fn load_toml(event: &str, name: Name, path: &PathBuf, loader: &mut EnvLoader) ->
 
                     // Insert a metadata table w/ information on the source being loaded
                     let mut metadata = toml_edit::table();
+                    metadata["root"] = value(loader.root_dir.to_string_lossy().to_string());
                     metadata["src"] = value(path.to_string_lossy().to_string());
                     metadata["src-size"] = value(size as i64);
                     metadata["event"] = value(event);

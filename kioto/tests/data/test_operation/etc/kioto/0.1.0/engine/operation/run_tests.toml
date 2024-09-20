@@ -1,0 +1,4 @@
+events = [
+    { event = "test" },
+    { event = "test2" }
+]
