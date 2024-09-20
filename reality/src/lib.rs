@@ -7,7 +7,14 @@
 //!
 //! The framework is built on top of the tokio runtime system, and an effort is made to make all components thread-safe by default.
 
+mod content_utils;
+pub use reality_derive::Plugin;
 pub mod plugin;
+
+pub use content_utils::BincodeContent;
+pub use content_utils::NilContent;
+pub use content_utils::RandomContent;
+
 pub use plugin::Plugin;
 pub use plugin::State;
 
@@ -23,7 +30,6 @@ pub use uuid;
 pub use uuid::Uuid;
 
 use plugin::Name;
-use serde::Serialize;
 
 /// Type-alias for spawning work
 pub type CallResult = Result<Work>;
@@ -79,39 +85,11 @@ impl From<std::io::Error> for Error {
     }
 }
 
-pub struct BincodeContent {
-    state_uuid: Uuid,
-}
-
-impl BincodeContent {
-    /// Creates a new Bincode Content
-    pub fn new<S: Serialize>(c: &S) -> std::io::Result<Self> {
-        match bincode::serialize(c) {
-            Ok(b) => {
-                let mut crc = crate::content::crc().digest();
-                crc.update(&b);
-                Ok(Self {
-                    state_uuid: uuid::Uuid::from_u64_pair(crc.finalize(), 0),
-                })
-            }
-            Err(e) => Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                e.to_string(),
-            )),
-        }
-    }
-}
-
-impl runir::Content for BincodeContent {
-    fn state_uuid(&self) -> uuid::Uuid {
-        self.state_uuid.clone()
-    }
-}
-
 #[cfg(test)]
 pub(crate) mod tests {
     use crate::*;
     use plugin::{Bind, Call, Handler, Plugin, State, Work};
+    use reality_derive::Plugin;
     use runir::Resource;
     use semver::Version;
     use serde::{Deserialize, Serialize};
@@ -533,5 +511,26 @@ pub(crate) mod tests {
         fn state_uuid(&self) -> uuid::Uuid {
             BincodeContent::new(self).unwrap().state_uuid()
         }
+    }
+
+    #[derive(Plugin, Serialize)]
+    #[reality(
+        call = call_test_derive,
+        content_with = test_content_with,
+    )]
+    struct TestDerive;
+
+    fn call_test_derive(bind: Bind<TestDerive>) -> CallResult {
+        bind.work(|_, _| async { Ok(())} )
+    }
+
+    fn test_content_with(_: &TestDerive) -> Uuid {
+        Uuid::new_v4()
+    }
+
+    #[tokio::test]
+    async fn test_test_derive() {
+        let mut state = State::new();
+        let _ = state.load(TestDerive);
     }
 }

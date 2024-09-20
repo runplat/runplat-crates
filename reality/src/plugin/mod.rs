@@ -72,7 +72,8 @@ pub trait Plugin: Resource + Content + Sized {
     /// ## Guidance
     /// Can be overriden to customize how forking is applied to the inner item.
     ///
-    /// A plugin can be forked from either a `Call` or `Event` struct
+    /// A plugin can be forked from either a `Call` or `Event` struct. It's important to note
+    /// that once an item has been forked in this manner, it can no longer be tracked in state.
     #[inline]
     fn fork(item: &Item) -> Item {
         item.clone()

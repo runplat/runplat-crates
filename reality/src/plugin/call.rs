@@ -17,7 +17,7 @@ use crate::Result;
 /// Serves as the context when a plugin is called
 #[derive(Clone)]
 pub struct Call {
-    ///
+    /// State which is the origin of this call
     pub(crate) state: State,
     /// Resource associated to this call
     pub(crate) item: Item,

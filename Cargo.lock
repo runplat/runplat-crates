@@ -753,6 +753,7 @@ dependencies = [
  "bincode",
  "clap",
  "hex",
+ "reality-derive",
  "runir",
  "semver",
  "serde",
@@ -762,6 +763,15 @@ dependencies = [
  "tracing",
  "tracing-test",
  "uuid",
+]
+
+[[package]]
+name = "reality-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
