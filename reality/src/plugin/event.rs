@@ -1,8 +1,10 @@
-use runir::store::Item;
-use tokio_util::sync::CancellationToken;
-use tracing::debug;
+use std::sync::Arc;
+
 use super::{thunk::HandlerThunk, Address, Call, Handler, Thunk};
 use crate::{Error, Result};
+use runir::{repr::Labels, store::Item};
+use tokio_util::sync::CancellationToken;
+use tracing::debug;
 
 /// Intermediary for calling a plugin
 #[derive(Clone)]
@@ -15,6 +17,8 @@ pub struct Event {
     pub(crate) thunk: Thunk,
     /// Plugin handler thunk
     pub(crate) handler: Option<Thunk>,
+    /// Labels
+    pub(crate) labels: Option<Arc<Labels>>,
 }
 
 impl Event {
@@ -38,13 +42,14 @@ impl Event {
                 call: forked,
                 thunk: self.thunk.clone(),
                 handler: self.handler.clone(),
+                labels: self.labels.clone(),
             },
             cancel,
         )
     }
 
     /// Sets the handler on this event
-    /// 
+    ///
     /// Returns an error if the handler's associated Target type does not match
     /// the current event's plugin type
     #[inline]
@@ -58,7 +63,7 @@ impl Event {
     }
 
     /// Sets the handler on this event w/o generic typing
-    /// 
+    ///
     /// Returns an error if the handler's associated Target type does not match the current
     /// event's plugin type
     #[inline]
@@ -70,7 +75,6 @@ impl Event {
             Err(Error::PluginMismatch)
         }
     }
-
 
     /// Consumes and starts the event
     #[inline]
@@ -87,5 +91,13 @@ impl Event {
     #[inline]
     pub fn item(&self) -> &Item {
         &self.call.item
+    }
+
+    /// Returns the value of a label
+    #[inline]
+    pub fn label(&self, label: &str) -> Option<&str> {
+        self.labels
+            .as_ref()
+            .and_then(|l| l.get(label).map(|l| l.as_str()))
     }
 }

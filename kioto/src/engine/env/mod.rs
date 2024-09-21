@@ -7,6 +7,7 @@ pub use config::Metadata;
 
 mod build;
 pub use build::Builder as EnvBuilder;
+use reality::repr::Labels;
 
 use super::{Load, LoadInput, Operation};
 use crate::plugins::{Request, RequestArgs};
@@ -107,9 +108,10 @@ impl Env {
         &mut self,
         name: &Name,
         input: impl Into<LoadInput>,
+        labels: Labels,
     ) -> Result<reality::plugin::Address, std::io::Error> {
         match self.find_loader(name) {
-            Some(load) => load.load(&mut self.state, input),
+            Some(load) => load.load(&mut self.state, input, labels),
             None => Err(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 "Could not find loader for plugin",
@@ -142,6 +144,7 @@ url = "https://jsonplaceholder.typicode.com/posts"
         "#,
             )
             .unwrap(),
+            Labels::default(),
         );
 
         let loaded = loaded.expect("should be able to load");
@@ -153,14 +156,16 @@ url = "https://jsonplaceholder.typicode.com/posts"
     #[tracing_test::traced_test]
     async fn test_env_build() {
         let default = build::Builder::new("test_operation", default_create_env);
-        
+
         // Clean up env
         let target = PathBuf::from(".test").join("test_operatoin");
         if target.exists() {
             std::fs::remove_dir_all(target).unwrap();
         }
 
-        default.build_env("tests/data", ".test").expect("should be able to build");
+        default
+            .build_env("tests/data", ".test")
+            .expect("should be able to build");
         default.load_env(".test").expect("should be able to load");
     }
 }

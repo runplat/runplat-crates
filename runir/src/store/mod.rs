@@ -11,7 +11,7 @@ pub use observe::ObservationEvent;
 pub use put::Put;
 
 use crate::{
-    repr::{Attributes, Identifier, Repo},
+    repr::{Attributes, Identifier, Labels, Repo},
     Resource,
 };
 
@@ -48,6 +48,7 @@ impl Store {
             resource,
             ident: Identifier::Unit,
             attributes: Attributes::new(journal),
+            labels: Labels(BTreeMap::new()),
         }
     }
 

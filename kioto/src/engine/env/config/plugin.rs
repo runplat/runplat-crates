@@ -1,9 +1,13 @@
 use crate::{engine::env::Env, Errors, PluginLoadErrors, Result};
-use reality::{content::crc, plugin::{Address, Name}};
+use reality::{
+    content::crc,
+    plugin::{Address, Name},
+    repr::Labels,
+};
 use serde::{Deserialize, Serialize};
+use std::{collections::BTreeMap, io::Read, path::PathBuf, str::FromStr};
 use toml_edit::value;
 use tracing::debug;
-use std::{collections::BTreeMap, io::Read, path::PathBuf, str::FromStr};
 
 /// Define settings settings for configuring a plugin
 #[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -67,8 +71,23 @@ fn load_toml(event: &str, name: Name, path: &PathBuf, loader: &mut Env) -> Resul
                     // **Note**: Store in a field that isn't a native rust field, however
                     // callers can opt in to deserialize if they wish
                     settings[crate::KT_LOADER_METADATA_TABLE] = metadata;
-                    
-                    Ok(loader.load(&name, settings).unwrap())
+
+                    // Apply labels
+                    let mut labels = Labels::default();
+                    if let Some(_labels) = settings
+                        .get(crate::KT_BUILD_METADATA_TABLE)
+                        .and_then(|t| t.get("labels"))
+                        .and_then(|t| t.as_table())
+                    {
+                        for (k, v) in _labels
+                            .iter()
+                            .filter_map(|(k, v)| v.as_str().map(|v| (k, v)))
+                        {
+                            labels.insert(k.to_string(), v.to_string());
+                        }
+                    }
+
+                    Ok(loader.load(&name, settings, labels).unwrap())
                 }
                 Err(io) => Err(Errors::PluginLoadError(
                     PluginLoadErrors::CouldNotReadFile {

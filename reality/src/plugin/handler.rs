@@ -1,4 +1,5 @@
 use clap::{ArgMatches, FromArgMatches};
+use runir::repr::Labels;
 use serde::de::DeserializeOwned;
 use tracing::debug;
 
@@ -60,19 +61,19 @@ pub trait Handler: Plugin {
 
     /// Loads this plugin by toml
     #[inline]
-    fn load_handler_by_toml(state: &mut State, toml: &str) -> std::io::Result<Address>
+    fn load_handler_by_toml(state: &mut State, toml: &str, labels: Labels) -> std::io::Result<Address>
     where
         Self: DeserializeOwned,
     {
-        state.load_handler_by_toml::<Self>(toml)
+        state.load_handler_by_toml::<Self>(toml, labels)
     }
 
     /// Loads this plugin by cli args
     #[inline]
-    fn load_handler_by_args(state: &mut State, args: &ArgMatches) -> std::io::Result<Address>
+    fn load_handler_by_args(state: &mut State, args: &ArgMatches, labels: Labels) -> std::io::Result<Address>
     where
         Self: FromArgMatches,
     {
-        state.load_handler_by_args::<Self>(args)
+        state.load_handler_by_args::<Self>(args, labels)
     }
 }

@@ -75,10 +75,7 @@ impl Config {
                         Err(err) => Err(format!("Could not parse declared plugin {err:?}")),
                     }
                 }
-                Err(err) => Err(format!(
-                    "Parsing `-kt-build` failed: {}",
-                    err.message()
-                )),
+                Err(err) => Err(format!("Parsing `-kt-build` failed: {}", err.message())),
             }
         } else {
             Err(format!("Skipping toml file `-kt-build` table not found"))

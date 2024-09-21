@@ -1,16 +1,17 @@
 use clap::{ArgMatches, FromArgMatches};
 use reality::{
     plugin::{Address, Handler, Name},
+    repr::Labels,
     Content, Plugin, Repr, Resource, State,
 };
 use serde::de::DeserializeOwned;
 use std::io::Error;
 
 /// Type-alias for a function to load a plugin by toml
-type LoadByToml = fn(&mut State, &str) -> std::io::Result<Address>;
+type LoadByToml = fn(&mut State, &str, Labels) -> std::io::Result<Address>;
 
 /// Type-alias for a function to load a plugin by arg matches
-type LoadByArgs = fn(&mut State, &ArgMatches) -> std::io::Result<Address>;
+type LoadByArgs = fn(&mut State, &ArgMatches, Labels) -> std::io::Result<Address>;
 
 /// Resource for loading a plugin
 #[derive(Clone)]
@@ -45,11 +46,16 @@ impl Load {
         &'load self,
         state: &mut State,
         input: impl Into<LoadInput>,
+        labels: Labels,
     ) -> std::io::Result<Address> {
         let input = input.into();
         match (&self.load, input) {
-            (LoadBy::Toml(load_toml), LoadInput::Toml(input_toml)) => load_toml(state, &input_toml),
-            (LoadBy::Args(load_args), LoadInput::Args(input_args)) => load_args(state, &input_args),
+            (LoadBy::Toml(load_toml), LoadInput::Toml(input_toml)) => {
+                load_toml(state, &input_toml, labels)
+            }
+            (LoadBy::Args(load_args), LoadInput::Args(input_args)) => {
+                load_args(state, &input_args, labels)
+            }
             _ => Err(Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "Could not load input with provided input settings",

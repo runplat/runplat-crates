@@ -1,3 +1,5 @@
+use super::utils::{with_cancel, PluginCommands};
+use crate::kt_metadata;
 use bytes::{Bytes, BytesMut};
 use clap::Args;
 use http_body_util::combinators::BoxBody;
@@ -9,8 +11,6 @@ use std::{future::Future, path::PathBuf, pin::Pin, sync::OnceLock, task::Poll};
 use tokio::{net::TcpStream, select};
 use tracing::{debug, error, trace, warn};
 use url::Url;
-use super::utils::{with_cancel, PluginCommands};
-use crate::kt_metadata;
 
 /// Type-alias for the default result type returned by this plugin's plumbing
 type Result<T> = std::io::Result<T>;
@@ -67,7 +67,7 @@ pub struct RequestArgs {
     #[clap(long = "http2")]
     use_http2: bool,
     /// Url to send the request to
-    #[clap(long, short, required=true)]
+    #[clap(long, short, required = true)]
     url: Url,
     /// Plugin command to execute
     #[clap(subcommand)]
@@ -92,21 +92,21 @@ impl Plugin for RequestArgs {
                         .await
                         .map_err(|e| binding.plugin_call_error(e.to_string()))?;
 
-                    with_cancel(ct).run(req.client()(request), |o| {
-                        match o {
+                    with_cancel(ct)
+                        .run(req.client()(request), |o| match o {
                             Ok(resp) => {
                                 if req.response.is_some() {
-                                    Err(binding.plugin_call_error("Response was already set and has not been handled"))
+                                    Err(binding.plugin_call_error(
+                                        "Response was already set and has not been handled",
+                                    ))
                                 } else {
                                     req.response = Some(resp);
                                     Ok(())
                                 }
-                            },
-                            Err(err) => {
-                                Err(binding.plugin_call_error(err.to_string()))
-                            },
-                        }
-                    }).await
+                            }
+                            Err(err) => Err(binding.plugin_call_error(err.to_string())),
+                        })
+                        .await
                 } else {
                     Err(binding.plugin_call_error("Request was not loaded"))
                 }
@@ -573,7 +573,7 @@ mod tests {
 
     use clap::{CommandFactory, Parser, Subcommand};
     use http_body_util::BodyExt;
-    use reality::State;
+    use reality::{repr::Labels, State};
 
     use crate::engine::Engine;
 
@@ -595,6 +595,7 @@ mod tests {
 url = "https://jsonplaceholder.typicode.com/posts"
 http2 = false
 "#,
+                Labels::default(),
             )
             .expect("should be able to load request");
 
@@ -625,6 +626,7 @@ http2 = false
 url = "https://jsonplaceholder.typicode.com/posts"
 http2 = false
 "#,
+                Labels::default(),
             )
             .expect("should be able to load request");
 
@@ -667,6 +669,7 @@ headers = [
   "x-ms-CORRELATION-ID=test"
 ]
 "#,
+                Labels::default(),
             )
             .expect("should be able to load request");
 
@@ -716,7 +719,7 @@ headers = [
         let (_, subcommand) = matches.subcommand().unwrap();
 
         state
-            .load_by_args::<RequestArgs>(subcommand)
+            .load_by_args::<RequestArgs>(subcommand, Labels::default())
             .expect("should be able to load request");
 
         let mut plugin = state
@@ -734,7 +737,7 @@ headers = [
             "test",
             "--url",
             "https://jsonplaceholder.typicode.com/posts",
-            "run"
+            "run",
         ]);
         assert_eq!(
             "https://jsonplaceholder.typicode.com/posts",
@@ -757,7 +760,7 @@ headers = [
             "--put",
             "--url",
             "https://jsonplaceholder.typicode.com/posts",
-            "run"
+            "run",
         ]);
         assert_eq!(
             "https://jsonplaceholder.typicode.com/posts",
@@ -780,7 +783,7 @@ headers = [
             "--post",
             "--url",
             "https://jsonplaceholder.typicode.com/posts",
-            "run"
+            "run",
         ]);
         assert_eq!(
             "https://jsonplaceholder.typicode.com/posts",
@@ -803,7 +806,7 @@ headers = [
             "--delete",
             "--url",
             "https://jsonplaceholder.typicode.com/posts",
-            "run"
+            "run",
         ]);
         assert_eq!(
             "https://jsonplaceholder.typicode.com/posts",
@@ -826,7 +829,7 @@ headers = [
             "--patch",
             "--url",
             "https://jsonplaceholder.typicode.com/posts",
-            "run"
+            "run",
         ]);
         assert_eq!(
             "https://jsonplaceholder.typicode.com/posts",
@@ -852,7 +855,7 @@ headers = [
             "-H 'x-ms-Custom=test'",
             "--url",
             "https://jsonplaceholder.typicode.com/posts",
-            "run"
+            "run",
         ]);
         assert_eq!(
             "https://jsonplaceholder.typicode.com/posts",

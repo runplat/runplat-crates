@@ -8,7 +8,7 @@ pub trait Metadata {
     fn build(&self) -> Option<&Build> {
         None
     }
-    
+
     fn loader(&self) -> Option<&Loader> {
         None
     }
@@ -30,7 +30,7 @@ pub struct Build {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BuildHandler {
-    target: Option<String>
+    target: Option<String>,
 }
 
 /// Loader metadata that can be used to build a collection of .toml files
@@ -50,7 +50,7 @@ pub struct Loader {
     pub event: String,
     /// CRC digest of the source using the CRC_64_MS algo
     #[serde(rename = "crc-ms")]
-    pub crc_ms: String
+    pub crc_ms: String,
 }
 
 impl Loader {

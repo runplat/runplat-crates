@@ -1,12 +1,11 @@
-mod request;
 mod repl;
-
+mod request;
 
 pub use request::Request;
 pub use request::RequestArgs;
 
 /// ## Plugin Utils
-/// 
+///
 /// Various utilities for constructing plugins
 pub mod utils {
     use std::future::Future;
@@ -27,7 +26,7 @@ pub mod utils {
         #[default]
         Run,
         /// Exports the plugin configuration to the current environment
-        Export(ExportArgs)
+        Export(ExportArgs),
     }
 
     #[derive(Args, Serialize)]
@@ -36,12 +35,12 @@ pub mod utils {
         pub name: String,
     }
 
-    pub fn with_cancel(token: CancellationToken) -> TaskCancelWrapper { 
+    pub fn with_cancel(token: CancellationToken) -> TaskCancelWrapper {
         token.into()
     }
 
     pub struct TaskCancelWrapper {
-        cancel: CancellationToken
+        cancel: CancellationToken,
     }
 
     impl From<CancellationToken> for TaskCancelWrapper {
@@ -51,9 +50,13 @@ pub mod utils {
     }
 
     impl TaskCancelWrapper {
-        pub async fn run<F, O>(self, fut: F, on_complete: impl FnOnce(O) -> reality::Result<()>) -> reality::Result<()>
+        pub async fn run<F, O>(
+            self,
+            fut: F,
+            on_complete: impl FnOnce(O) -> reality::Result<()>,
+        ) -> reality::Result<()>
         where
-            F: Future<Output = O> 
+            F: Future<Output = O>,
         {
             select! {
                 o = fut => {

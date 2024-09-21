@@ -2,12 +2,12 @@ mod env;
 mod load;
 mod operation;
 pub use env::default_create_env;
+pub use env::BuildMetadata;
 pub use env::EngineConfig;
-pub use env::EnvBuilder;
 pub use env::Env;
+pub use env::EnvBuilder;
 pub use env::EventConfig;
 pub use env::LoaderMetadata;
-pub use env::BuildMetadata;
 pub use env::Metadata;
 pub use load::Load;
 pub use load::LoadBy;
@@ -65,14 +65,16 @@ mod tests {
     #[tokio::test]
     async fn test_env_loader_returns_error_when_no_valid_files_are_build() {
         let env = EnvBuilder::new("test_no_valid", default_create_env);
-        env.build_env("tests/data", ".test").expect_err("should return an error because no valid files are found");
+        env.build_env("tests/data", ".test")
+            .expect_err("should return an error because no valid files are found");
     }
 
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_env_loader_can_load_identical_plugin_config() {
         let env = EnvBuilder::new("test_identical", default_create_env);
-        env.build_env("tests/data", ".test").expect("should be able to build env");
+        env.build_env("tests/data", ".test")
+            .expect("should be able to build env");
 
         let loader = env
             .load_env(".test")
@@ -106,10 +108,10 @@ mod tests {
     async fn test_env_loader_test_operation() {
         // Builder to build and load an env
         let env = EnvBuilder::default_env("test_operation");
-        
+
         // Test building the env before trying to load it
         env.build_env("tests/data", ".test").unwrap();
-    
+
         // Load a new environment
         let env = env
             .load_env(".test")
@@ -141,5 +143,9 @@ mod tests {
             .take_response()
             .unwrap();
         assert!(resp.status().is_success());
+
+        let event = engine.event(1).unwrap();
+        let label = event.label("test").unwrap();
+        assert_eq!("testval", label);
     }
 }

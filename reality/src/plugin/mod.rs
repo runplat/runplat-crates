@@ -13,6 +13,7 @@ pub use call::Call;
 pub use event::Event;
 pub use handler::Handler;
 pub use name::Name;
+use runir::repr::Labels;
 pub use state::State;
 pub use thunk::HandlerThunk;
 pub use thunk::Thunk;
@@ -51,20 +52,20 @@ pub trait Plugin: Resource + Content + Sized {
 
     /// Loads this plugin by toml
     #[inline]
-    fn load_by_toml(state: &mut State, toml: &str) -> std::io::Result<Address>
+    fn load_by_toml(state: &mut State, toml: &str, labels: Labels) -> std::io::Result<Address>
     where
         Self: DeserializeOwned,
     {
-        state.load_by_toml::<Self>(toml)
+        state.load_by_toml::<Self>(toml, labels)
     }
 
     /// Loads this plugin by cli args
     #[inline]
-    fn load_by_args(state: &mut State, args: &ArgMatches) -> std::io::Result<Address>
+    fn load_by_args(state: &mut State, args: &ArgMatches, labels: Labels) -> std::io::Result<Address>
     where
         Self: FromArgMatches,
     {
-        state.load_by_args::<Self>(args)
+        state.load_by_args::<Self>(args, labels)
     }
 
     /// Forks the item

@@ -1,8 +1,9 @@
 use super::Repr;
 use crate::{Content, Resource};
-use std::{collections::BTreeMap, ops::Deref};
+use std::{collections::BTreeMap, ops::{Deref, DerefMut}};
 
 /// Wrapper struct for a ordered label representation
+#[derive(Default, Debug)]
 pub struct Labels(pub BTreeMap<String, String>);
 
 impl Repr for Labels {}
@@ -29,6 +30,12 @@ impl Deref for Labels {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for Labels {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 

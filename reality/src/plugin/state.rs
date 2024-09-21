@@ -4,7 +4,7 @@ use crate::{
     Error, Result,
 };
 use clap::ArgMatches;
-use runir::{repo::Handle, repr::Attributes, store::Item, Store};
+use runir::{repo::Handle, repr::{Attributes, Labels}, store::Item, Store};
 use serde::de::DeserializeOwned;
 use std::{collections::BTreeMap, future::Future, ops::Deref, path::PathBuf, pin::Pin};
 use tokio_util::sync::CancellationToken;
@@ -94,11 +94,12 @@ impl State {
     pub fn load_by_args<P: Plugin + clap::FromArgMatches>(
         &mut self,
         matches: &ArgMatches,
+        labels: Labels
     ) -> std::io::Result<Address> {
         let plugin = P::from_arg_matches(matches)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()))?;
 
-        Ok(self.load(plugin))
+        Ok(self.load(plugin, labels))
     }
 
     /// Loads and registers a plugin from toml
@@ -106,20 +107,24 @@ impl State {
     pub fn load_by_toml<P: Plugin + DeserializeOwned>(
         &mut self,
         toml: &str,
+        labels: Labels
     ) -> std::io::Result<Address> {
         let plugin = toml::from_str::<P>(toml)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.message()))?;
-        Ok(self.load(plugin))
+        Ok(self.load(plugin, labels))
     }
 
     /// Registers a plugin w/ the the current state
     #[inline]
-    pub fn load<P: Plugin>(&mut self, plugin: P) -> Address {
+    pub fn load<P: Plugin>(&mut self, plugin: P, labels: Labels) -> Address {
         use crate::plugin::MustLoad;
         let name = P::name();
 
         // TODO: Might want to refactor this to return a Load builder
-        let put = self.store.put(plugin);
+        let mut put = self.store.put(plugin);
+        for (k, v) in labels.iter() {
+            put = put.label(k, v);
+        }
         let handle = P::load(P::must_load(put)).commit();
         let address = name.path().join(hex::encode(handle.commit().to_be_bytes()));
         self.plugins.insert(name.path().clone(), handle.clone());
@@ -141,11 +146,12 @@ impl State {
     pub fn load_handler_by_args<H: Handler + clap::FromArgMatches>(
         &mut self,
         matches: &ArgMatches,
+        labels: Labels
     ) -> std::io::Result<Address> {
         let plugin = H::from_arg_matches(matches)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()))?;
 
-        Ok(self.load_handler(plugin))
+        Ok(self.load_handler(plugin, labels))
     }
 
     /// Loads and registers a plugin from toml
@@ -153,18 +159,22 @@ impl State {
     pub fn load_handler_by_toml<H: Handler + DeserializeOwned>(
         &mut self,
         toml: &str,
+        labels: Labels
     ) -> std::io::Result<Address> {
         let plugin = toml::from_str::<H>(toml)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.message()))?;
-        Ok(self.load_handler(plugin))
+        Ok(self.load_handler(plugin, labels))
     }
 
     /// Registers a plugin w/ the the current state
     #[inline]
-    pub fn load_handler<H: Handler>(&mut self, plugin: H) -> Address {
+    pub fn load_handler<H: Handler>(&mut self, plugin: H, labels: Labels) -> Address {
         use crate::plugin::MustLoadHandler;
         let name = H::name();
-        let put = self.store.put(plugin);
+        let mut put = self.store.put(plugin);
+        for (k, v) in labels.iter() {
+            put = put.label(k, v);
+        }
         let handle = H::load(H::must_load(put)).commit();
         self.plugins.insert(name.path().clone(), handle.clone());
         self.plugins.insert(
@@ -235,12 +245,14 @@ impl State {
                     cancel: cancel.clone(),
                     handle: self.handle.clone(),
                 };
+                let labels = item.attributes().get::<Labels>();
 
                 Ok(Event {
                     address,
                     call,
                     thunk: thunk.as_ref().clone(),
                     handler: None,
+                    labels
                 })
             }
             None => Err(Error::PluginNotFound),

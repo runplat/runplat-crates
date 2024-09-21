@@ -21,8 +21,8 @@ pub use runplat_macros::Plugin;
 
 /// Re-export runir since it will be required for extending reality
 pub use runir;
-pub use runir::*;
 pub use runir::content;
+pub use runir::*;
 
 /// Re-export semver::Version
 pub use semver::Version;
@@ -81,7 +81,9 @@ impl From<tokio::task::JoinError> for Error {
 
 impl From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Self {
-        Self::IOError { message: e.to_string() }
+        Self::IOError {
+            message: e.to_string(),
+        }
     }
 }
 
@@ -89,8 +91,9 @@ impl From<std::io::Error> for Error {
 pub(crate) mod tests {
     use crate::*;
     use plugin::{Bind, Call, Handler, Plugin, State, Work};
-    use runplat_macros::Plugin;
+    use repr::Labels;
     use runir::Resource;
+    use runplat_macros::Plugin;
     use semver::Version;
     use serde::{Deserialize, Serialize};
     use std::{
@@ -132,7 +135,10 @@ pub(crate) mod tests {
         });
 
         state
-            .load_by_toml::<TomlPlugin>(&toml.expect("should be able to serialize"))
+            .load_by_toml::<TomlPlugin>(
+                &toml.expect("should be able to serialize"),
+                Labels::default(),
+            )
             .expect("should be able to load");
 
         let addr = state
@@ -148,17 +154,23 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn test_plugin_replacement() {
         let mut state = State::new();
-        state.load(TestPlugin {
-            skip: false,
-            called: Arc::new(OnceLock::new()),
-            call_mut: false,
-        });
+        state.load(
+            TestPlugin {
+                skip: false,
+                called: Arc::new(OnceLock::new()),
+                call_mut: false,
+            },
+            Labels::default(),
+        );
 
-        state.load(TestPlugin {
-            skip: true,
-            called: Arc::new(OnceLock::new()),
-            call_mut: false,
-        });
+        state.load(
+            TestPlugin {
+                skip: true,
+                called: Arc::new(OnceLock::new()),
+                call_mut: false,
+            },
+            Labels::default(),
+        );
         let mut addresses = state.addresses();
         assert_eq!(
             "reality/0.1.0/tests/testplugin/1014f00795fef610",
@@ -174,11 +186,14 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn test_plugin_work_cancel() {
         let mut state = State::new();
-        state.load(TestPlugin {
-            skip: false,
-            called: Arc::new(OnceLock::new()),
-            call_mut: false,
-        });
+        state.load(
+            TestPlugin {
+                skip: false,
+                called: Arc::new(OnceLock::new()),
+                call_mut: false,
+            },
+            Labels::default(),
+        );
 
         let path = TestPlugin::name();
         let (f, cancel) = state.spawn(path.path()).expect("should spawn");
@@ -217,11 +232,14 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn test_plugin_mismatch() {
         let mut state = State::new();
-        state.load(TestPlugin {
-            skip: false,
-            called: Arc::new(OnceLock::new()),
-            call_mut: false,
-        });
+        state.load(
+            TestPlugin {
+                skip: false,
+                called: Arc::new(OnceLock::new()),
+                call_mut: false,
+            },
+            Labels::default(),
+        );
 
         let plugin = state.find_plugin(TestPlugin::name().path()).unwrap();
         let call = Call {
@@ -289,11 +307,14 @@ pub(crate) mod tests {
     async fn test_plugin_call() {
         let called = Arc::new(OnceLock::new());
         let mut state = State::init().await;
-        state.load(TestPlugin {
-            skip: false,
-            called: called.clone(),
-            call_mut: false,
-        });
+        state.load(
+            TestPlugin {
+                skip: false,
+                called: called.clone(),
+                call_mut: false,
+            },
+            Labels::default(),
+        );
 
         let path = TestPlugin::name();
         let _ = state.call(path.path()).await.unwrap();
@@ -306,11 +327,14 @@ pub(crate) mod tests {
     async fn test_plugin_call_work_mut() {
         let called = Arc::new(OnceLock::new());
         let mut state = State::init().await;
-        state.load(TestPlugin {
-            skip: false,
-            called: called.clone(),
-            call_mut: true,
-        });
+        state.load(
+            TestPlugin {
+                skip: false,
+                called: called.clone(),
+                call_mut: true,
+            },
+            Labels::default(),
+        );
 
         let path = TestPlugin::name();
         let _ = state.call(path.path()).await.unwrap();
@@ -327,11 +351,14 @@ pub(crate) mod tests {
     async fn test_plugin_call_skip() {
         let called = Arc::new(OnceLock::new());
         let mut state = State::init().await;
-        state.load(TestPlugin {
-            skip: true,
-            called: called.clone(),
-            call_mut: false,
-        });
+        state.load(
+            TestPlugin {
+                skip: true,
+                called: called.clone(),
+                call_mut: false,
+            },
+            Labels::default(),
+        );
 
         let path = TestPlugin::name();
         assert_eq!(
@@ -357,11 +384,14 @@ pub(crate) mod tests {
     async fn test_plugin_call_by_path() {
         let called = Arc::new(OnceLock::new());
         let mut state = State::init().await;
-        state.load(TestPlugin {
-            skip: false,
-            called: called.clone(),
-            call_mut: false,
-        });
+        state.load(
+            TestPlugin {
+                skip: false,
+                called: called.clone(),
+                call_mut: false,
+            },
+            Labels::default(),
+        );
 
         let _ = state.call("reality/0.1.0/tests/testplugin").await.unwrap();
         assert!(called.get().unwrap());
@@ -375,11 +405,14 @@ pub(crate) mod tests {
             .unwrap();
         let called = Arc::new(OnceLock::new());
         let mut state = State::with(rt.handle().clone());
-        state.load(TestPlugin {
-            skip: false,
-            called: called.clone(),
-            call_mut: false,
-        });
+        state.load(
+            TestPlugin {
+                skip: false,
+                called: called.clone(),
+                call_mut: false,
+            },
+            Labels::default(),
+        );
 
         rt.block_on(async move {
             let path = TestPlugin::name();
@@ -394,18 +427,23 @@ pub(crate) mod tests {
     async fn test_state_with_event_handler() {
         let called = Arc::new(OnceLock::new());
         let mut state = State::init().await;
-        state.load(TestPlugin {
-            skip: false,
-            called: called.clone(),
-            call_mut: false,
-        });
-        state.load(TestPluginHandler { test_plugin: None });
+        state.load(
+            TestPlugin {
+                skip: false,
+                called: called.clone(),
+                call_mut: false,
+            },
+            Labels::default(),
+        );
+        state.load(TestPluginHandler { test_plugin: None }, Labels::default());
 
         let mut event = state.event("reality/0.1.0/tests/testplugin").unwrap();
         event.with_handler::<TestPluginHandler>().unwrap();
         event.start().await.unwrap();
 
-        let event = state.event("reality/0.1.0/tests/testpluginhandler").unwrap();
+        let event = state
+            .event("reality/0.1.0/tests/testpluginhandler")
+            .unwrap();
         let handler = event.call.item.borrow::<TestPluginHandler>().unwrap();
         assert!(handler.test_plugin.is_some());
     }
@@ -449,9 +487,7 @@ pub(crate) mod tests {
     }
     impl Plugin for TestPluginHandler {
         fn call(bind: Bind<Self>) -> Result<plugin::Work> {
-            bind.work(|_, _| async {
-                Ok(())
-            })
+            bind.work(|_, _| async { Ok(()) })
         }
         fn version() -> Version {
             Version::new(0, 1, 0)
@@ -521,7 +557,7 @@ pub(crate) mod tests {
     struct TestDerive;
 
     fn call_test_derive(bind: Bind<TestDerive>) -> CallResult {
-        bind.work(|_, _| async { Ok(())} )
+        bind.work(|_, _| async { Ok(()) })
     }
 
     fn test_content_with(_: &TestDerive) -> Uuid {
@@ -531,6 +567,6 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn test_test_derive() {
         let mut state = State::new();
-        let _ = state.load(TestDerive);
+        let _ = state.load(TestDerive, Labels::default());
     }
 }

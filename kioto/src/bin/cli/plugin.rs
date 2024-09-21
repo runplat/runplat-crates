@@ -13,5 +13,5 @@ pub struct PluginArgs {
 #[derive(Subcommand)]
 pub enum Plugins {
     /// HTTPS request plugin
-    Request(RequestArgs)
+    Request(RequestArgs),
 }

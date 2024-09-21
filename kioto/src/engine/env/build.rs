@@ -18,7 +18,7 @@ pub struct Builder {
 
 impl Builder {
     /// Creates an new builder using the default env_loader
-    /// 
+    ///
     /// The default env_loader implementation will include all plugins from this crate
     #[inline]
     pub fn default_env(label: impl Into<String>) -> Self {
@@ -64,12 +64,15 @@ impl Builder {
                                         match config.parse_build_document(&event_name, doc) {
                                             Ok(name) => {
                                                 debug!(
-                                                    path = entry.path().to_string_lossy().to_string(),
+                                                    path =
+                                                        entry.path().to_string_lossy().to_string(),
                                                     plugin = name.full_plugin_ref().to_string(),
                                                     "Built file"
                                                 );
 
-                                                if let Some(_replaced) = copy_tasks.insert((name, event_name), entry.path()) {
+                                                if let Some(_replaced) = copy_tasks
+                                                    .insert((name, event_name), entry.path())
+                                                {
                                                     // TODO: Shouldn't be able to replace
                                                 }
                                             }
@@ -98,7 +101,10 @@ impl Builder {
         }
 
         if copy_tasks.is_empty() {
-            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "No valid files were found".to_string()));
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "No valid files were found".to_string(),
+            ));
         }
 
         match toml::to_string(&config) {
@@ -114,10 +120,11 @@ impl Builder {
                     std::fs::copy(&source, &to)?;
                 }
                 Ok(())
-            },
-            Err(err) => {
-                Err(std::io::Error::new(std::io::ErrorKind::InvalidData, err.to_string()))
-            },
+            }
+            Err(err) => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                err.to_string(),
+            )),
         }
     }
 

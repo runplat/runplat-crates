@@ -1,5 +1,5 @@
 use super::*;
-use crate::{repo::Handle, repr::Repr, Content};
+use crate::{repo::Handle, repr::{Labels, Repr}, Content};
 
 /// Constructs a "put" operation to the store
 pub struct Put<'put, R> {
@@ -11,6 +11,8 @@ pub struct Put<'put, R> {
     pub(crate) attributes: Attributes,
     /// Identifier for this resource
     pub(crate) ident: Identifier<'put>,
+    /// Labels to store with these attributes
+    pub(crate) labels: Labels,
 }
 
 impl<'put, R: Resource + Content> Put<'put, R> {
@@ -24,6 +26,13 @@ impl<'put, R: Resource + Content> Put<'put, R> {
     #[inline]
     pub fn resource_mut(&mut self) -> &mut R {
         &mut self.resource
+    }
+
+    /// Adds a label to the Labels collection
+    #[inline]
+    pub fn label(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.labels.insert(key.into(), value.into());
+        self
     }
 
     /// Adds an attribute for this resource
@@ -49,7 +58,17 @@ impl<'put, R: Resource + Content> Put<'put, R> {
     /// Commits the resource to the store
     #[inline]
     #[must_use]
-    pub fn commit(self) -> Handle {
+    pub fn commit(mut self) -> Handle {
+        // Add labels to attributes
+        let handle = self
+            .store
+            .repo
+            .assign(self.labels, &self.resource)
+            .ident(self.ident.clone())
+            .complete();
+        self.attributes.insert::<Labels>(&handle);
+
+        // Add attributes to resource
         let handle = self
             .store
             .repo

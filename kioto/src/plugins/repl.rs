@@ -1,6 +1,7 @@
 use clap::ArgMatches;
 use reality::{
-    plugin::{Bind, Handler}, CallResult, Content, Plugin, Repr, Resource, Uuid
+    plugin::{Bind, Handler},
+    CallResult, Content, Plugin, Repr, Resource, Uuid,
 };
 
 use super::utils::with_cancel;
@@ -142,17 +143,20 @@ mod tests {
     use super::ReplEval;
     use crate::plugins::repl::Repl;
     use clap::{Arg, ArgAction};
-    use reality::{CallResult, Content, Plugin, Resource, State, Uuid};
+    use reality::{repr::Labels, CallResult, Content, Plugin, Resource, State, Uuid};
     use tokio::io::AsyncWriteExt;
 
     #[ignore = "would block"]
     #[tokio::test]
     async fn test_example_repl_impl() {
         let mut state = State::new();
-        let address = state.load(Echo {
-            message: String::new(),
-        });
-        let _ = state.load_handler(Repl::<Echo>::default());
+        let address = state.load(
+            Echo {
+                message: String::new(),
+            },
+            Labels::default(),
+        );
+        let _ = state.load_handler(Repl::<Echo>::default(), Labels::default());
 
         let mut event = state.event(&address).unwrap();
         event.with_handler::<Repl<Echo>>().unwrap();

@@ -14,10 +14,9 @@ pub mod plugins;
 pub const KT_BUILD_METADATA_TABLE: &str = "-kt-build";
 
 /// Name of the table for LoaderMetadata
-/// 
+///
 /// **Note**: Loader metadata is created by the loader, will be ignored if set by the user.
 pub const KT_LOADER_METADATA_TABLE: &str = "-kt-loader";
-
 
 /// Type-alias for a crate error
 pub type Result<T> = std::result::Result<T, Errors>;
@@ -54,7 +53,10 @@ impl CouldNotLoadPlugin {
     /// Creates a new could not load plugin error
     #[inline]
     pub fn new(event: impl Into<String>, name: Name) -> Self {
-        Self { event: event.into(), name }
+        Self {
+            event: event.into(),
+            name,
+        }
     }
 }
 
