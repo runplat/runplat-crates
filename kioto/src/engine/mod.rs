@@ -9,6 +9,9 @@ pub use env::EnvBuilder;
 pub use env::EventConfig;
 pub use env::LoaderMetadata;
 pub use env::Metadata;
+pub use env::TemplateMap;
+pub use env::TemplateField;
+pub use env::TemplateData;
 pub use load::Load;
 pub use load::LoadBy;
 pub use load::LoadInput;
@@ -57,8 +60,10 @@ impl Engine {
 
 #[cfg(test)]
 mod tests {
+    use toml::toml;
+
     use crate::{
-        engine::{default_create_env, env::EnvBuilder, EventConfig, Operation},
+        engine::{default_create_env, env::EnvBuilder, EventConfig, Metadata, Operation, TemplateData},
         plugins::Request,
     };
 
@@ -147,5 +152,50 @@ mod tests {
         let event = engine.event(2).unwrap();
         let label = event.label("test").unwrap();
         assert_eq!("testval", label);
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_env_loader_test_templates() {
+        // Builder to build and load an env
+        let env = EnvBuilder::default_env("test_templates");
+
+        // Test building the env before trying to load it
+        env.build_env("tests/data", ".test").unwrap();
+
+        // Load a new environment
+        let env = env
+            .load_env(".test")
+            .expect("should be able to load test env");
+
+        let event = env
+            .create_event(&EventConfig {
+                event: "test_basic".to_string(),
+                handler: None,
+            })
+            .unwrap();
+            
+        let request = event.item().borrow::<Request>().unwrap();
+        let data: toml::Table = toml! {
+            [url]
+            host = "jsonplaceholder.typicode.com"
+            path = "posts"
+        };
+        let applied = request.apply_template_toml_data(&data).unwrap();
+        assert_eq!("https://jsonplaceholder.typicode.com/posts", applied.url().as_str());
+
+        let data = TemplateData::from(data);
+        let applied = data.apply(request).unwrap();
+        assert_eq!("https://jsonplaceholder.typicode.com/posts", applied.url().as_str());
+
+        let data = serde_json::json! ({
+            "url": {
+                "host": "jsonplaceholder.typicode.com",
+                "path": "posts"
+            }
+        });
+        let data = TemplateData::from(data);
+        let applied = data.apply(request).unwrap();
+        assert_eq!("https://jsonplaceholder.typicode.com/posts", applied.url().as_str());
     }
 }

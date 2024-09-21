@@ -17,9 +17,18 @@ pub mod utils {
     use tokio::select;
     use tokio_util::sync::CancellationToken;
 
-    /// Re-export of Metadata type, which can be used as a field
+    /// Re-export of Loader Metadata type, which can be used as a field
     /// to retrieve metadata information from when the plugin loaded
     pub use crate::engine::LoaderMetadata;
+
+    /// Re-export of Build Metadata type
+    pub use crate::engine::BuildMetadata;
+
+    /// Re-export of TemplateMap type
+    pub use crate::engine::TemplateMap;
+
+    /// Re-export of TemplateField type
+    pub use crate::engine::TemplateField;
 
     /// Common plugin commands to execute
     #[derive(Serialize, Subcommand, Default)]

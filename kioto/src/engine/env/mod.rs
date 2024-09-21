@@ -4,6 +4,9 @@ pub use config::EngineConfig;
 pub use config::EventConfig;
 pub use config::LoaderMetadata;
 pub use config::Metadata;
+pub use config::TemplateMap;
+pub use config::TemplateField;
+pub use config::TemplateData;
 
 mod build;
 pub use build::Builder as EnvBuilder;

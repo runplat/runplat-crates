@@ -1,8 +1,6 @@
 use std::{collections::BTreeMap, path::PathBuf};
-
-use serde::{Deserialize, Serialize};
-
-use super::plugin::LoadSource;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use super::{plugin::LoadSource, TemplateMap};
 
 pub trait Metadata {
     fn build(&self) -> Option<&Build> {
@@ -11,6 +9,38 @@ pub trait Metadata {
 
     fn loader(&self) -> Option<&Loader> {
         None
+    }
+
+    /// Apply template configuration from build metadata and return updated state
+    fn apply_template_toml_data(&self, data: &toml::Table) -> std::io::Result<Self>
+    where
+        Self: Serialize + DeserializeOwned
+    {
+        match self.build().and_then(|b| b.templates.as_ref()) {
+            Some(templates) => {
+                let map = TemplateMap::from(templates);
+                map.apply_toml(self, data)
+            },
+            None => {
+                Err(std::io::Error::new(std::io::ErrorKind::NotFound, "No template fields declared in build metadata"))
+            },
+        }
+    }
+
+    /// Apply template configuration from build metadata and return updated state
+    fn apply_template_json_data(&self, data: &serde_json::Map<String, serde_json::Value>) -> std::io::Result<Self>
+    where
+        Self: Serialize + DeserializeOwned
+    {
+        match self.build().and_then(|b| b.templates.as_ref()) {
+            Some(templates) => {
+                let map = TemplateMap::from(templates);
+                map.apply_json(self, data)
+            },
+            None => {
+                Err(std::io::Error::new(std::io::ErrorKind::NotFound, "No template fields declared in build metadata"))
+            },
+        }
     }
 }
 
@@ -22,8 +52,23 @@ pub struct Build {
     pub plugin: String,
     /// Load source setting
     pub load: Option<LoadSource>,
+    /// Map of labels to include when loading the plugin into state
     #[serde(default)]
     pub labels: BTreeMap<String, String>,
+    /// Map of fields that are template strings and a config of the
+    /// expected input values
+    /// 
+    /// # Example Usage
+    /// ```toml
+    /// # Indicates that the url field below is using a template string
+    /// # Each field must be declared
+    /// -kt-build.templates.url.host = ""
+    /// # The field can also be an inline table w/ various settings
+    /// -kt-build.templates.url.path = { match = "<regex>", default = "/posts",  }
+    /// 
+    /// url = "https://{{host}}/{{path}}"
+    /// ```
+    pub templates: Option<BTreeMap<String, toml::Table>>,
     /// True if the plugin should be added as a handler
     pub handler: Option<BuildHandler>,
 }

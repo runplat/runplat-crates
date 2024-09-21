@@ -1,4 +1,4 @@
-use super::utils::{with_cancel, PluginCommands};
+use super::utils::{with_cancel, PluginCommands, TemplateField};
 use crate::kt_metadata;
 use bytes::{Bytes, BytesMut};
 use clap::Args;
@@ -186,7 +186,7 @@ impl Content for RequestArgs {
 #[derive(Serialize, Deserialize)]
 pub struct Request {
     /// URL to send the request to
-    url: Url,
+    url: TemplateField<Url>,
     /// If true, will use http2 when making the request
     #[serde(rename = "http2", default)]
     use_http2: bool,
@@ -258,6 +258,11 @@ impl Plugin for Request {
 }
 
 impl Request {
+    /// Returns a reference to the request url
+    pub fn url(&self) -> String {
+        self.url.to_string()
+    }
+
     /// Takes the response from the request args
     pub fn take_response(&mut self) -> Option<Response<Incoming>> {
         self.response.take()
@@ -266,7 +271,7 @@ impl Request {
     /// Creates a new request for url
     fn new(url: Url) -> Self {
         Self {
-            url,
+            url: TemplateField::from(url),
             use_http2: false,
             file: None,
             json: None,
@@ -301,7 +306,15 @@ impl Request {
     /// Creates the http request
     #[inline]
     async fn create_request(&self) -> hyper::http::Result<hyper::Request<Body>> {
-        let url_authority = self.url.authority();
+        let url = self.url.try_as_inner().map_err(|_| {
+            hyper::http::Error::from(
+                hyper::http::uri::Builder::new()
+                    .build()
+                    .expect_err("should be an error"),
+            )
+        })?;
+
+        let url_authority = url.authority();
         let mut builder = RequestBuilder::new()
             .uri(self.url.to_string())
             .header(header::HOST, url_authority);
@@ -741,7 +754,7 @@ headers = [
         ]);
         assert_eq!(
             "https://jsonplaceholder.typicode.com/posts",
-            req.url.as_str()
+            req.url.as_inner().unwrap().as_str()
         );
         assert!(!req.use_http2);
         assert!(req.file.is_none());
@@ -764,7 +777,7 @@ headers = [
         ]);
         assert_eq!(
             "https://jsonplaceholder.typicode.com/posts",
-            req.url.as_str()
+            req.url.as_inner().unwrap().as_str()
         );
         assert!(!req.use_http2);
         assert!(req.file.is_none());
@@ -787,7 +800,7 @@ headers = [
         ]);
         assert_eq!(
             "https://jsonplaceholder.typicode.com/posts",
-            req.url.as_str()
+            req.url.as_inner().unwrap().as_str()
         );
         assert!(!req.use_http2);
         assert!(req.file.is_none());
@@ -810,7 +823,7 @@ headers = [
         ]);
         assert_eq!(
             "https://jsonplaceholder.typicode.com/posts",
-            req.url.as_str()
+            req.url.as_inner().unwrap().as_str()
         );
         assert!(!req.use_http2);
         assert!(req.file.is_none());
@@ -833,7 +846,7 @@ headers = [
         ]);
         assert_eq!(
             "https://jsonplaceholder.typicode.com/posts",
-            req.url.as_str()
+            req.url.as_inner().unwrap().as_str()
         );
         assert!(!req.use_http2);
         assert!(req.file.is_none());
@@ -859,7 +872,7 @@ headers = [
         ]);
         assert_eq!(
             "https://jsonplaceholder.typicode.com/posts",
-            req.url.as_str()
+            req.url.as_inner().unwrap().as_str()
         );
         assert!(!req.use_http2);
         assert!(req.file.is_none());
