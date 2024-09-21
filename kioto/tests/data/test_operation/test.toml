@@ -1,0 +1,8 @@
+# Test request definition
+url = "https://jsonplaceholder.typicode.com/posts"
+
+[-kt-build]
+plugin = "kioto/plugins.request@0.1.0"
+
+[-kt-build.labels]
+test = "test_label"

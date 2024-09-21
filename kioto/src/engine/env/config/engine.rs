@@ -1,8 +1,9 @@
 use super::{EventConfig, PluginConfig};
-use crate::{engine::env::EnvLoader, Result};
-use reality::plugin::{Address, Event, HandlerThunk};
+use crate::{engine::env::Env, Result};
+use reality::plugin::{Address, Event, HandlerThunk, Name};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::PathBuf};
+use toml_edit::DocumentMut;
 use tracing::debug;
 
 /// Configures an engine environment
@@ -34,6 +35,56 @@ pub struct Config {
 }
 
 impl Config {
+    /// Tries to parse build metadata from a document,
+    ///
+    /// Returns an error message if unsuccessful, otherwise adds the plugin config to the current config
+    pub fn parse_build_document(
+        &mut self,
+        event_name: impl Into<String>,
+        doc: DocumentMut,
+    ) -> std::result::Result<Name, String> {
+        let event_name = event_name.into();
+        if let Some(table) = doc.get("-kt-build").and_then(|t| t.as_table_like()) {
+            let table: toml_edit::Table = table.iter().collect();
+            match toml::from_str::<super::BuildMetadata>(&format!("{}", table)) {
+                Ok(metadata) => {
+                    match metadata.plugin.parse::<Name>() {
+                        Ok(name) => {
+                            // debug!("Building file {:?}", entry.path());
+                            if let Some(_) = metadata.handler.as_ref() {
+                                self.handlers.insert(
+                                    event_name,
+                                    PluginConfig {
+                                        plugin: metadata.plugin.to_string(),
+                                        load: metadata.load.clone(),
+                                        labels: metadata.labels.clone(),
+                                    },
+                                );
+                            } else {
+                                self.plugins.insert(
+                                    event_name,
+                                    PluginConfig {
+                                        plugin: metadata.plugin.to_string(),
+                                        load: metadata.load.clone(),
+                                        labels: metadata.labels.clone(),
+                                    },
+                                );
+                            }
+                            Ok(name)
+                        }
+                        Err(err) => Err(format!("Could not parse declared plugin {err:?}")),
+                    }
+                }
+                Err(err) => Err(format!(
+                    "Parsing `-kt-build` failed: {}",
+                    err.message()
+                )),
+            }
+        } else {
+            Err(format!("Skipping toml file `-kt-build` table not found"))
+        }
+    }
+
     /// Tries to load an env engine config from some root directory, i.e. `<root>/<env>/config.toml`
     ///
     /// Returns an error if the file could not be read, found, or deserialized
@@ -48,7 +99,7 @@ impl Config {
 
     /// Load the engine config into state, creates map of loaded handlers and plugins
     #[inline]
-    pub fn load(&mut self, loader: &mut EnvLoader) -> Result<()> {
+    pub fn load(&mut self, loader: &mut Env) -> Result<()> {
         for (event_name, conf) in self.plugins.iter() {
             debug!("Loading event `{event_name}`");
             let address = conf.load(&event_name, loader)?;
@@ -68,7 +119,7 @@ impl Config {
     ///
     /// Returns an error if the plugin could not found or event created
     #[inline]
-    pub fn event(&self, name: &str, loader: &EnvLoader) -> reality::Result<Event> {
+    pub fn event(&self, name: &str, loader: &Env) -> reality::Result<Event> {
         self.loaded_plugins
             .get(name)
             .map(|p| loader.state.event(p))
@@ -79,16 +130,18 @@ impl Config {
     ///
     /// Returns an error if the plugin could not found
     #[inline]
-    pub fn handler(&self, name: &str, loader: &EnvLoader) -> reality::Result<HandlerThunk> {
-        self.loaded_plugins
+    pub fn handler(&self, name: &str, loader: &Env) -> reality::Result<HandlerThunk> {
+        self.loaded_handlers
             .get(name)
             .map(|p| loader.state.handler(p))
             .unwrap_or(Err(reality::Error::PluginNotFound))
     }
 
-    /// Tries to configure an event from an event config
+    /// Tries to configure an event from loaded plugins and handlers
+    ///
+    /// If the event config specifies a handler, the handler will be applied to the returned event
     #[inline]
-    pub fn config_event(&self, config: &EventConfig, loader: &EnvLoader) -> reality::Result<Event> {
+    pub fn configure_event(&self, config: &EventConfig, loader: &Env) -> reality::Result<Event> {
         match config.split_for_lookup() {
             (event, None) => self.event(&event, loader),
             (event, Some(handler)) => {

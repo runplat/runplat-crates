@@ -1,3 +1,4 @@
+-kt-build = { plugin = "kioto/engine.operation@0.1.0" }
 events = [
     { event = "test" },
     { event = "test2" }

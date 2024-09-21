@@ -4,8 +4,20 @@
 
 use reality::plugin::Name;
 
+pub use runplat_macros::kt_metadata;
+extern crate self as kioto;
+
 pub mod engine;
 pub mod plugins;
+
+/// Name of the table for BuildMetadata
+pub const KT_BUILD_METADATA_TABLE: &str = "-kt-build";
+
+/// Name of the table for LoaderMetadata
+/// 
+/// **Note**: Loader metadata is created by the loader, will be ignored if set by the user.
+pub const KT_LOADER_METADATA_TABLE: &str = "-kt-loader";
+
 
 /// Type-alias for a crate error
 pub type Result<T> = std::result::Result<T, Errors>;

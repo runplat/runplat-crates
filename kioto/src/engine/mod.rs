@@ -1,11 +1,13 @@
 mod env;
 mod load;
 mod operation;
-pub use env::default_env;
+pub use env::default_create_env;
 pub use env::EngineConfig;
+pub use env::EnvBuilder;
 pub use env::Env;
-pub use env::EnvLoader;
 pub use env::EventConfig;
+pub use env::LoaderMetadata;
+pub use env::BuildMetadata;
 pub use env::Metadata;
 pub use load::Load;
 pub use load::LoadBy;
@@ -55,130 +57,66 @@ impl Engine {
 
 #[cfg(test)]
 mod tests {
-    use reality::Plugin;
-    use std::path::PathBuf;
-
     use crate::{
-        engine::{EventConfig, Operation},
+        engine::{default_create_env, env::EnvBuilder, EventConfig, Operation},
         plugins::Request,
-        test_env,
     };
-    test_env!(test);
 
     #[tokio::test]
-    async fn test_env_loader_can_load_from_filesystem() {
-        let test_dir = PathBuf::from(".test/test");
-        let test_source = PathBuf::from("tests/data");
-        if test_dir.exists() {
-            std::fs::remove_dir_all(&test_dir).unwrap();
-        }
-        std::fs::create_dir_all(&test_dir).unwrap();
+    async fn test_env_loader_returns_error_when_no_valid_files_are_build() {
+        let env = EnvBuilder::new("test_no_valid", default_create_env);
+        env.build_env("tests/data", ".test").expect_err("should return an error because no valid files are found");
+    }
 
-        let test_config_src = test_source.join("test").join("config.toml");
-        let test_config_dest = test_dir.join("config.toml");
-        std::fs::copy(test_config_src, test_config_dest).unwrap();
-        let test_config_plugin_test = test_source
-            .join("test")
-            .join("etc")
-            .join(Request::name().path())
-            .join("test.toml");
-        let test_config_plugin_test_dest = test_dir.join("etc").join(Request::name().path());
-        std::fs::create_dir_all(&test_config_plugin_test_dest).unwrap();
-        let test_config_plugin_test_dest = test_config_plugin_test_dest.join("test.toml");
-        std::fs::copy(test_config_plugin_test, test_config_plugin_test_dest).unwrap();
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_env_loader_can_load_identical_plugin_config() {
+        let env = EnvBuilder::new("test_identical", default_create_env);
+        env.build_env("tests/data", ".test").expect("should be able to build env");
 
-        let test_config_plugin_test = test_source
-            .join("test")
-            .join("etc")
-            .join(Request::name().path())
-            .join("test2.toml");
-        let test_config_plugin_test_dest = test_dir.join("etc").join(Request::name().path());
-        std::fs::create_dir_all(&test_config_plugin_test_dest).unwrap();
-        let test_config_plugin_test_dest = test_config_plugin_test_dest.join("test2.toml");
-        std::fs::copy(test_config_plugin_test, test_config_plugin_test_dest).unwrap();
-        let env = test::env();
         let loader = env
-            .env_loader(".test")
+            .load_env(".test")
             .expect("should be able to load test env");
 
         let event = loader
-            .get_event(&EventConfig {
+            .create_event(&EventConfig {
                 event: "test".to_string(),
                 handler: None,
             })
             .unwrap();
         assert_eq!(
-            "kioto/0.1.0/plugins/request/b937ab23c51e66ac",
+            "kioto/0.1.0/plugins/request/4849b2adfad5a5da",
             event.address().to_string()
         );
 
         let event = loader
-            .get_event(&EventConfig {
+            .create_event(&EventConfig {
                 event: "test2".to_string(),
                 handler: None,
             })
             .unwrap();
         assert_eq!(
-            "kioto/0.1.0/plugins/request/48b5b448d8d9cdce",
+            "kioto/0.1.0/plugins/request/fb51ee142f39ae12",
             event.address().to_string()
         );
     }
 
-    test_env!(test_operation);
-
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_env_loader_test_operation() {
-        let test_dir = PathBuf::from(".test/test_operation");
-        let test_source = PathBuf::from("tests/data");
-        if test_dir.exists() {
-            std::fs::remove_dir_all(&test_dir).unwrap();
-        }
-        std::fs::create_dir_all(&test_dir).unwrap();
-
-        let test_config_src = test_source.join("test_operation").join("config.toml");
-        let test_config_dest = test_dir.join("config.toml");
-        std::fs::copy(test_config_src, test_config_dest).unwrap();
-        let test_config_plugin_test = test_source
-            .join("test_operation")
-            .join("etc")
-            .join(Request::name().path())
-            .join("test.toml");
-        let test_config_plugin_test_dest = test_dir.join("etc").join(Request::name().path());
-        std::fs::create_dir_all(&test_config_plugin_test_dest).unwrap();
-        let test_config_plugin_test_dest = test_config_plugin_test_dest.join("test.toml");
-        std::fs::copy(test_config_plugin_test, test_config_plugin_test_dest).unwrap();
-
-        let test_config_plugin_test = test_source
-            .join("test_operation")
-            .join("etc")
-            .join(Request::name().path())
-            .join("test2.toml");
-        let test_config_plugin_test_dest = test_dir.join("etc").join(Request::name().path());
-        std::fs::create_dir_all(&test_config_plugin_test_dest).unwrap();
-        let test_config_plugin_test_dest = test_config_plugin_test_dest.join("test2.toml");
-        std::fs::copy(test_config_plugin_test, test_config_plugin_test_dest).unwrap();
-        let test_config_plugin_test = test_source
-            .join("test_operation")
-            .join("etc")
-            .join(Operation::name().path())
-            .join("run_tests.toml");
-        let test_config_plugin_test_dest = test_dir.join("etc").join(Operation::name().path());
-        std::fs::create_dir_all(&test_config_plugin_test_dest).unwrap();
-        let test_config_plugin_test_dest = test_config_plugin_test_dest.join("run_tests.toml");
-        std::fs::copy(test_config_plugin_test, test_config_plugin_test_dest).unwrap();
-
-        let test_config_src = test_source.join("test_operation").join("config.toml");
-        let test_config_dest = test_dir.join("config.toml");
-        std::fs::copy(test_config_src, test_config_dest).unwrap();
-
-        let env = test_operation::env();
-        let loader = env
-            .env_loader(".test")
+        // Builder to build and load an env
+        let env = EnvBuilder::default_env("test_operation");
+        
+        // Test building the env before trying to load it
+        env.build_env("tests/data", ".test").unwrap();
+    
+        // Load a new environment
+        let env = env
+            .load_env(".test")
             .expect("should be able to load test env");
 
-        let event = loader
-            .get_event(&EventConfig {
+        let event = env
+            .create_event(&EventConfig {
                 event: "run_tests".to_string(),
                 handler: None,
             })

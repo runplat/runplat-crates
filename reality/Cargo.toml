@@ -17,4 +17,4 @@ tracing = "0.1.40"
 tracing-test = "0.2.5"
 uuid = { version = "1.10.0", features = ["v4"] }
 bincode = { version = "1.3.3" }
-reality-derive = { path = "../reality-derive" }
+runplat-macros = { path = "../runplat-macros" }

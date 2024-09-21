@@ -1,4 +1,4 @@
-use crate::{engine::env::EnvLoader, Errors, PluginLoadErrors, Result};
+use crate::{engine::env::Env, Errors, PluginLoadErrors, Result};
 use reality::{content::crc, plugin::{Address, Name}};
 use serde::{Deserialize, Serialize};
 use toml_edit::value;
@@ -9,12 +9,12 @@ use std::{collections::BTreeMap, io::Read, path::PathBuf, str::FromStr};
 #[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Config {
     /// Plugin being loaded
-    plugin: String,
+    pub plugin: String,
     /// Plugin load settings
-    load: Option<LoadSource>,
+    pub load: Option<LoadSource>,
     /// Labels to add as an attribute after loading the plugin
     #[serde(default)]
-    labels: BTreeMap<String, String>,
+    pub labels: BTreeMap<String, String>,
 }
 
 impl Config {
@@ -22,7 +22,7 @@ impl Config {
     ///
     /// Returns an error if the plugin could not be loaded successfully
     #[inline]
-    pub fn load(&self, event: &str, loader: &mut EnvLoader) -> Result<Address> {
+    pub fn load(&self, event: &str, loader: &mut Env) -> Result<Address> {
         let name = Name::from_str(&self.plugin)?;
         if let Some(load) = self.load.as_ref() {
             match load {
@@ -44,7 +44,7 @@ impl Config {
 }
 
 /// Loads toml from an env loader
-fn load_toml(event: &str, name: Name, path: &PathBuf, loader: &mut EnvLoader) -> Result<Address> {
+fn load_toml(event: &str, name: Name, path: &PathBuf, loader: &mut Env) -> Result<Address> {
     debug!("Trying to load {path:?}");
     match std::fs::OpenOptions::new().read(true).open(path) {
         Ok(mut opened) => {
@@ -66,7 +66,7 @@ fn load_toml(event: &str, name: Name, path: &PathBuf, loader: &mut EnvLoader) ->
 
                     // **Note**: Store in a field that isn't a native rust field, however
                     // callers can opt in to deserialize if they wish
-                    settings["_kt-meta"] = metadata;
+                    settings[crate::KT_LOADER_METADATA_TABLE] = metadata;
                     
                     Ok(loader.load(&name, settings).unwrap())
                 }
@@ -88,7 +88,7 @@ fn load_toml(event: &str, name: Name, path: &PathBuf, loader: &mut EnvLoader) ->
 }
 
 /// Enumeration of load plugin source variants
-#[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[serde(tag = "type")]
 pub enum LoadSource {
     /// Load source is from a file path

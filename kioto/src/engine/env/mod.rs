@@ -1,84 +1,41 @@
 mod config;
+pub use config::BuildMetadata;
 pub use config::EngineConfig;
 pub use config::EventConfig;
+pub use config::LoaderMetadata;
 pub use config::Metadata;
 
-use reality::plugin::Event;
-use super::Operation;
-use super::{Load, LoadInput};
+mod build;
+pub use build::Builder as EnvBuilder;
+
+use super::{Load, LoadInput, Operation};
 use crate::plugins::{Request, RequestArgs};
 use clap::FromArgMatches;
 use reality::{
-    plugin::{Handler, Name},
+    plugin::{Event, Handler, Name},
     repo::Handle,
-    Content, Plugin, Repr, Resource, State, Uuid,
+    Plugin, State,
 };
 use serde::de::DeserializeOwned;
 use std::{collections::BTreeSet, path::PathBuf};
 
-/// Type-alias for a function that creates an environment
-type CreateLoader = fn(String, PathBuf) -> EnvLoader;
+/// Creates an env w/ default set of plugin loaders
+pub fn default_create_env(label: String, root_dir: PathBuf) -> Env {
+    let mut loader = Env {
+        label,
+        root_dir,
+        state: State::new(),
+        config: EngineConfig::default(),
+        loaders: BTreeSet::new(),
+    };
+    loader.add_toml_loader::<Operation>();
+    loader.add_toml_loader::<Request>();
+    loader.add_args_loader::<RequestArgs>();
+    loader
+}
 
-/// Struct containing tools for creating a new environment
-/// 
-/// The default implementation will automatically include all plugins implemented in this crate
+/// Struct containing environment state which can be used to load plugins for building engine state
 pub struct Env {
-    /// Label for this environment
-    label: String,
-    /// Function for creating a new environment
-    create_loader: CreateLoader,
-}
-
-impl Env {
-    /// Creates a new env repr
-    #[inline]
-    pub fn new(label: impl Into<String>, create_loader: CreateLoader) -> Self {
-        Self {
-            label: label.into().trim_matches(['"']).to_string(),
-            create_loader,
-        }
-    }
-
-    /// Tries to initialize from some root directory,
-    ///
-    /// Will load all config immediately and set the env loader with the loaded config.
-    ///
-    /// The EnvLoader can then be used to load events from event configurations
-    #[inline]
-    pub fn env_loader(&self, root: impl Into<PathBuf>) -> std::io::Result<EnvLoader> {
-        let root = root.into();
-        let mut config = EngineConfig::from_file_system(root.clone(), &self.label)?;
-        let mut loader = (self.create_loader)(self.label.to_string(), root);
-        config
-            .load(&mut loader)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, format!("{e:?}")))?;
-        loader.config = config;
-        loader.label = self.label.clone();
-        Ok(loader)
-    }
-}
-
-impl Resource for Env {}
-impl Repr for Env {}
-impl Content for Env {
-    fn state_uuid(&self) -> reality::uuid::Uuid {
-        let mut crc = reality::content::crc().digest();
-        crc.update(self.label.as_bytes());
-        Uuid::from_u64_pair(crc.finalize(), 0)
-    }
-}
-
-impl Default for Env {
-    fn default() -> Self {
-        Self {
-            label: String::from("default"),
-            create_loader: default_env,
-        }
-    }
-}
-
-/// Struct containing state for loading an environment
-pub struct EnvLoader {
     /// Env label
     pub label: String,
     /// Root directory
@@ -91,7 +48,7 @@ pub struct EnvLoader {
     pub loaders: BTreeSet<(Name, Handle)>,
 }
 
-impl EnvLoader {
+impl Env {
     /// Adds a toml loader to the env loader
     #[inline]
     pub fn add_toml_loader<P: Plugin + DeserializeOwned>(&mut self) {
@@ -160,70 +117,23 @@ impl EnvLoader {
         }
     }
 
-    /// Tries to get and configure an event
+    /// Tries to create and configure an event
     #[inline]
-    pub fn get_event(&self, config: &EventConfig) -> reality::Result<Event> {
-        self.config.config_event(config, self)
+    pub fn create_event(&self, config: &EventConfig) -> reality::Result<Event> {
+        self.config.configure_event(config, self)
     }
-}
-
-/// Creates an env w/ default set of plugins
-pub fn default_env(label: String, root_dir: PathBuf) -> EnvLoader {
-    let mut loader = EnvLoader {
-        label,
-        root_dir,
-        state: State::new(),
-        config: EngineConfig::default(),
-        loaders: BTreeSet::new(),
-    };
-    loader.add_toml_loader::<Operation>();
-    loader.add_toml_loader::<Request>();
-    loader.add_args_loader::<RequestArgs>();
-    loader
-}
-
-/// Creates a new test Env
-#[macro_export]
-macro_rules! test_env {
-    ($vis:vis $name:ident) => {
-        $vis mod $name {
-            use crate::engine::*;
-            use crate::engine::env::EngineConfig;
-
-            /// Creates a new env
-            pub fn env() -> Env {
-                Env::new(stringify!($name), test_env)
-            }
-
-            /// Creates an env w/ default set of plugins
-            fn test_env(label: String, root_dir: std::path::PathBuf) -> EnvLoader {
-                let mut loader = EnvLoader {
-                    label,
-                    root_dir,
-                    state: State::new(),
-                    config: EngineConfig::default(),
-                    loaders: std::collections::BTreeSet::new(),
-                };
-                loader.add_toml_loader::<crate::engine::Operation>();
-                loader.add_toml_loader::<crate::plugins::Request>();
-                loader.add_args_loader::<crate::plugins::RequestArgs>();
-                loader
-            }
-        }
-    };
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::str::FromStr;
-    test_env!(macro_test);
 
     #[tokio::test]
     async fn test_test_env_macro() {
-        let env = macro_test::env();
+        let env = EnvBuilder::default_env("test");
 
-        let mut loader = env.env_loader(PathBuf::from(".test")).unwrap();
+        let mut loader = env.load_env(PathBuf::from(".test")).unwrap();
         let loaded = loader.load(
             &crate::plugins::Request::name(),
             toml_edit::DocumentMut::from_str(
@@ -237,5 +147,20 @@ url = "https://jsonplaceholder.typicode.com/posts"
         let loaded = loaded.expect("should be able to load");
         let event = loader.state.event(&loaded);
         event.expect("should be able to find request and create event");
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_env_build() {
+        let default = build::Builder::new("test_operation", default_create_env);
+        
+        // Clean up env
+        let target = PathBuf::from(".test").join("test_operatoin");
+        if target.exists() {
+            std::fs::remove_dir_all(target).unwrap();
+        }
+
+        default.build_env("tests/data", ".test").expect("should be able to build");
+        default.load_env(".test").expect("should be able to load");
     }
 }

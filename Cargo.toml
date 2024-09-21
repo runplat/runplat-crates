@@ -3,6 +3,6 @@ resolver = "2"
 members = [ 
     "kioto",
     "reality",
-    "reality-derive",
+    "runplat-macros",
     "runir"
 ]

@@ -1,6 +1,6 @@
 [package]
-name = "reality-derive"
-description = "Macros for deriving Reality traits and helper code."
+name = "runplat-macros"
+description = "Provides various derive and other macros for runplat collection"
 authors = ["juliusl@microsoft.com"]
 version = "0.1.0"
 edition = "2021"

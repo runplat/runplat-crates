@@ -9,10 +9,8 @@ use std::{future::Future, path::PathBuf, pin::Pin, sync::OnceLock, task::Poll};
 use tokio::{net::TcpStream, select};
 use tracing::{debug, error, trace, warn};
 use url::Url;
-
-use crate::engine::Metadata;
-
 use super::utils::{with_cancel, PluginCommands};
+use crate::kt_metadata;
 
 /// Type-alias for the default result type returned by this plugin's plumbing
 type Result<T> = std::io::Result<T>;
@@ -184,6 +182,7 @@ impl Content for RequestArgs {
 }
 
 /// Plugin to execute a request
+#[kt_metadata(build, loader)]
 #[derive(Serialize, Deserialize)]
 pub struct Request {
     /// URL to send the request to
@@ -203,8 +202,6 @@ pub struct Request {
     /// Response this request received
     #[serde(skip)]
     response: Option<Response<Incoming>>,
-    #[serde(rename = "_kt-meta")]
-    _meta: Option<Metadata>,
 }
 
 /// Bytes Body
@@ -276,7 +273,8 @@ impl Request {
             method: None,
             headers: vec![],
             response: None,
-            _meta: None,
+            _kt_build: None,
+            _kt_loader: None,
         }
     }
 

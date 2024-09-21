@@ -7,32 +7,32 @@
 //!
 //! The framework is built on top of the tokio runtime system, and an effort is made to make all components thread-safe by default.
 
-mod content_utils;
-pub use reality_derive::Plugin;
 pub mod plugin;
+pub use plugin::Plugin;
+pub use plugin::State;
 
+mod content_utils;
 pub use content_utils::BincodeContent;
 pub use content_utils::NilContent;
 pub use content_utils::RandomContent;
 
-pub use plugin::Plugin;
-pub use plugin::State;
+/// Re-export derive macro
+pub use runplat_macros::Plugin;
 
-use plugin::Work;
 /// Re-export runir since it will be required for extending reality
 pub use runir;
 pub use runir::*;
 pub use runir::content;
 
-/// Re-export common types
+/// Re-export semver::Version
 pub use semver::Version;
+
+/// Re-export uuid::Uuid
 pub use uuid;
 pub use uuid::Uuid;
 
-use plugin::Name;
-
 /// Type-alias for spawning work
-pub type CallResult = Result<Work>;
+pub type CallResult = Result<plugin::Work>;
 
 /// Type-alias for this crates main result type
 pub type Result<T> = std::result::Result<T, Error>;
@@ -65,7 +65,7 @@ pub enum Error {
     /// Custom error returned by the implementation of the plugin
     PluginCallError {
         /// Name of the plugin where the error occured
-        name: Name,
+        name: plugin::Name,
         message: String,
     },
 }
@@ -89,7 +89,7 @@ impl From<std::io::Error> for Error {
 pub(crate) mod tests {
     use crate::*;
     use plugin::{Bind, Call, Handler, Plugin, State, Work};
-    use reality_derive::Plugin;
+    use runplat_macros::Plugin;
     use runir::Resource;
     use semver::Version;
     use serde::{Deserialize, Serialize};

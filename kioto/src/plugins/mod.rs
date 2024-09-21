@@ -18,7 +18,7 @@ pub mod utils {
 
     /// Re-export of Metadata type, which can be used as a field
     /// to retrieve metadata information from when the plugin loaded
-    pub use crate::engine::Metadata;
+    pub use crate::engine::LoaderMetadata;
 
     /// Common plugin commands to execute
     #[derive(Serialize, Subcommand, Default)]

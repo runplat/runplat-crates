@@ -488,6 +488,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "reality",
+ "runplat-macros",
  "serde",
  "shlex",
  "tokio",
@@ -754,8 +755,8 @@ dependencies = [
  "bincode",
  "clap",
  "hex",
- "reality-derive",
  "runir",
+ "runplat-macros",
  "semver",
  "serde",
  "tokio",
@@ -764,15 +765,6 @@ dependencies = [
  "tracing",
  "tracing-test",
  "uuid",
-]
-
-[[package]]
-name = "reality-derive"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -834,6 +826,15 @@ version = "0.1.0"
 dependencies = [
  "crc",
  "uuid",
+]
+
+[[package]]
+name = "runplat-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
