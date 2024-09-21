@@ -16,6 +16,8 @@ pub mod util;
 pub use repr::Repr;
 pub use store::Store;
 
+extern crate self as runir;
+
 /// Trait representing a dynamic resource which can be stored and retrieved
 pub trait Resource: std::any::Any + Send + Sync + 'static {}
 

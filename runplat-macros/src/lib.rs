@@ -5,7 +5,9 @@ mod kioto;
 use kioto::KiotoMetadata;
 use kioto::MetadataFields;
 
+use quote::quote;
 use syn::parse_macro_input;
+use syn::DeriveInput;
 
 /// Derives reality `Plugin` trait and enables helper attribute for defining callbacks
 #[proc_macro_derive(
@@ -14,11 +16,35 @@ use syn::parse_macro_input;
         reality
     )
 )]
-pub fn derive_object_type(_item: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn derive_plugin(_item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let struct_data = parse_macro_input!(_item as Plugin);
     struct_data.render().into()
 }
 
+/// Derives `Resource` trait
+#[proc_macro_derive(Resource)]
+pub fn derive_resource(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let derive_input = parse_macro_input!(item as DeriveInput);
+
+    let ident = &derive_input.ident;
+    let (impl_generics, ty_generics, where_clause) = derive_input.generics.split_for_impl();
+    quote! {
+        impl #impl_generics runir::Resource for #ident #ty_generics #where_clause { }
+    }.into()
+}
+
+/// Derives `Repr` and `Resource` trait
+#[proc_macro_derive(Repr)]
+pub fn derive_repr(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let derive_input = parse_macro_input!(item as DeriveInput);
+
+    let ident = &derive_input.ident;
+    let (impl_generics, ty_generics, where_clause) = derive_input.generics.split_for_impl();
+    quote! {
+        impl #impl_generics runir::Repr for #ident #ty_generics #where_clause { }
+        impl #impl_generics runir::Resource for #ident #ty_generics #where_clause { }
+    }.into()
+}
 /// Helper macro for adding kioto metadata fields to a struct,
 /// 
 /// # Example Usage

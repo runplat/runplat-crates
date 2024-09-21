@@ -18,6 +18,8 @@ pub use content_utils::RandomContent;
 
 /// Re-export derive macro
 pub use runplat_macros::Plugin;
+pub use runplat_macros::Repr;
+pub use runplat_macros::Resource;
 
 /// Re-export runir since it will be required for extending reality
 pub use runir;

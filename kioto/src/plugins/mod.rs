@@ -1,6 +1,8 @@
 mod repl;
+mod process;
 mod request;
 
+pub use process::Process;
 pub use request::Request;
 pub use request::RequestArgs;
 

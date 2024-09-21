@@ -134,7 +134,7 @@ mod tests {
             .take_engine()
             .unwrap();
 
-        let event = engine.event(0).unwrap();
+        let event = engine.event(1).unwrap();
         let resp = event
             .item()
             .clone()
@@ -144,7 +144,7 @@ mod tests {
             .unwrap();
         assert!(resp.status().is_success());
 
-        let event = engine.event(1).unwrap();
+        let event = engine.event(2).unwrap();
         let label = event.label("test").unwrap();
         assert_eq!("testval", label);
     }

@@ -7,15 +7,12 @@ pub use config::Metadata;
 
 mod build;
 pub use build::Builder as EnvBuilder;
-use reality::repr::Labels;
 
 use super::{Load, LoadInput, Operation};
-use crate::plugins::{Request, RequestArgs};
+use crate::plugins::{Process, Request, RequestArgs};
 use clap::FromArgMatches;
 use reality::{
-    plugin::{Event, Handler, Name},
-    repo::Handle,
-    Plugin, State,
+    plugin::{Event, Handler, Name}, repo::Handle, repr::Labels, Plugin, State
 };
 use serde::de::DeserializeOwned;
 use std::{collections::BTreeSet, path::PathBuf};
@@ -30,6 +27,7 @@ pub fn default_create_env(label: String, root_dir: PathBuf) -> Env {
         loaders: BTreeSet::new(),
     };
     loader.add_toml_loader::<Operation>();
+    loader.add_toml_loader::<Process>();
     loader.add_toml_loader::<Request>();
     loader.add_args_loader::<RequestArgs>();
     loader
