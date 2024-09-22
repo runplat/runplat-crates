@@ -42,6 +42,12 @@ impl Item {
         }
     }
 
+    /// Returns the commit id of this item
+    #[inline]
+    pub fn commit(&self) -> u64 {
+        self.commit
+    }
+
     /// Returns attributes for this item
     ///
     /// If an item exists, it means that it will have an associated "Attributes" store which points to various attributes owned by this resource.

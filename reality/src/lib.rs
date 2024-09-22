@@ -50,6 +50,11 @@ pub enum Error {
     LoadPluginError,
     /// Error returned when a `Name` could not be parsed
     IncompletePluginName,
+    /// Error returned when previous request data exists for a handle
+    PreviousUnhandledRequest,
+    /// Error returned when trying to write request data, expecting the entry to
+    /// be empty, but replacing an existing entry
+    WriteRequestRaceCondition,
     /// Error when a plugin cannot be found in the current state
     PluginNotFound,
     /// Error returned when casting a dynamic pointer to a plugin
@@ -267,8 +272,8 @@ pub(crate) mod tests {
             handle: tokio::runtime::Handle::current(),
         };
         let mut bound = call.bind::<TestPlugin>().expect("should bind");
-        bound.plugin().expect("should return a plugin");
-        bound.plugin_mut().expect("should return a plugin");
+        bound.receiver().expect("should return a plugin");
+        bound.update().expect("should return a plugin");
 
         // Tests internal error handling
         let call = Call {
@@ -280,15 +285,16 @@ pub(crate) mod tests {
         };
         let mut bind = Bind::<NotTestPlugin> {
             call,
+            receiver: None,
             _bound: std::marker::PhantomData,
         };
         assert_eq!(
             Error::PluginMismatch,
-            bind.plugin().expect_err("should have an error")
+            bind.receiver().expect_err("should have an error")
         );
         assert_eq!(
             Error::PluginMismatch,
-            bind.plugin_mut().expect_err("should have an error")
+            bind.update().expect_err("should have an error")
         );
     }
 
@@ -500,8 +506,8 @@ pub(crate) mod tests {
         type Target = TestPlugin;
 
         fn handle(other: Bind<Self::Target>, mut handler: Bind<Self>) -> Result<()> {
-            let handler = handler.plugin_mut()?;
-            let target = other.plugin()?.clone();
+            let handler = handler.update()?;
+            let target = other.receiver()?.clone();
             handler.test_plugin = Some(target);
             Ok(())
         }
@@ -519,7 +525,7 @@ pub(crate) mod tests {
 
     impl Plugin for TestPlugin {
         fn call(bind: Bind<Self>) -> Result<Work> {
-            let plugin = bind.plugin()?;
+            let plugin = bind.receiver()?;
 
             if plugin.skip {
                 Err(Error::PluginCallSkipped)

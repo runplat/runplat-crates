@@ -6,10 +6,10 @@ pub use config::LoaderMetadata;
 pub use config::Metadata;
 pub use config::TemplateMap;
 pub use config::TemplateField;
-pub use config::TemplateData;
 
 mod build;
 pub use build::Builder as EnvBuilder;
+use reality::plugin::Requests;
 
 use super::{Load, LoadInput, Operation};
 use crate::plugins::{Process, Request, RequestArgs};
@@ -37,6 +37,7 @@ pub fn default_create_env(label: String, root_dir: PathBuf) -> Env {
 }
 
 /// Struct containing environment state which can be used to load plugins for building engine state
+#[derive(Clone)]
 pub struct Env {
     /// Env label
     pub label: String,
@@ -124,6 +125,12 @@ impl Env {
     #[inline]
     pub fn create_event(&self, config: &EventConfig) -> reality::Result<Event> {
         self.config.configure_event(config, self)
+    }
+
+    /// Returns access to requests state
+    #[inline]
+    pub fn requests(&self) -> &Requests {
+        self.state.requests()
     }
 }
 

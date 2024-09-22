@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, path::PathBuf};
+use reality::plugin::RequestData;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use super::{plugin::LoadSource, TemplateMap};
+use super::{plugin::LoadSource, TemplateData, TemplateMap};
 
 pub trait Metadata {
     fn build(&self) -> Option<&Build> {
@@ -9,6 +10,13 @@ pub trait Metadata {
 
     fn loader(&self) -> Option<&Loader> {
         None
+    }
+
+    fn apply_template(&self, data: impl Into<RequestData>) -> std::io::Result<Self>
+    where 
+    Self: Serialize + DeserializeOwned 
+    {
+        TemplateData::from(data.into()).apply(self)
     }
 
     /// Apply template configuration from build metadata and return updated state

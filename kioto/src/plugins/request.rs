@@ -1,5 +1,5 @@
 use super::utils::{with_cancel, PluginCommands, TemplateField};
-use crate::kt_metadata;
+use crate::{engine::Metadata, kt_metadata};
 use bytes::{Bytes, BytesMut};
 use clap::Args;
 use http_body_util::combinators::BoxBody;
@@ -79,13 +79,13 @@ pub struct RequestArgs {
 
 impl Plugin for RequestArgs {
     fn call(bind: Bind<Self>) -> CallResult {
-        let plugin = bind.plugin()?;
+        let plugin = bind.receiver()?;
         if plugin.request.is_none() {
             bind.skip()
         } else {
             bind.defer(|mut i, ct| async move {
                 let binding = i.clone();
-                let req = i.plugin_mut()?;
+                let req = i.update()?;
                 if let Some(req) = req.request.as_mut() {
                     let request = req
                         .create_request()
@@ -214,8 +214,12 @@ pub struct StringBody(String);
 pub struct EmptyBody;
 
 impl Plugin for Request {
+    fn receive(&self, data: reality::plugin::RequestData) -> Option<Self> {
+        self.apply_template(data).ok().inspect(|_| debug!("Applying template to request"))
+    }
+
     fn call(binding: reality::plugin::Bind<Self>) -> CallResult {
-        let plugin = binding.plugin()?;
+        let plugin = binding.receiver()?;
         if plugin.response.is_some() {
             debug!("Skipping request, response has not been removed");
             binding.skip()
@@ -229,7 +233,7 @@ impl Plugin for Request {
                     res = req_fut => {
                         match res {
                             Ok(resp) => {
-                                let plugin = b.plugin_mut()?;
+                                let plugin = b.update()?;
                                 if plugin.response.is_none() {
                                     plugin.response = Some(resp);
                                     Ok(())
@@ -289,7 +293,7 @@ impl Request {
     async fn prepare(
         binding: &Bind<Self>,
     ) -> reality::Result<(DefaultClient, hyper::Request<Body>)> {
-        let plugin = binding.plugin()?;
+        let plugin = binding.receiver()?;
         let request = plugin
             .create_request()
             .await

@@ -18,7 +18,7 @@ use tracing::debug;
 /// If a file location is not specified, this type will be constructed from the path format,
 ///
 /// `<root>/<env>/config.toml`
-#[derive(Default, Debug, Deserialize, Serialize)]
+#[derive(Clone, Default, Debug, Deserialize, Serialize)]
 pub struct Config {
     /// Plugins to be loaded by the environment
     #[serde(default)]

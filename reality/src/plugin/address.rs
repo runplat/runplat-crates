@@ -13,6 +13,14 @@ pub struct Address {
     pub(crate) commit: u64,
 }
 
+impl Address {
+    /// Commit id of this address 
+    #[inline]
+    pub fn commit(&self) -> u64 {
+        self.commit
+    }
+}
+
 impl std::fmt::Display for Address {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let path: PathBuf = self.into();

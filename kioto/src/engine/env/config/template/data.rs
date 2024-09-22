@@ -1,16 +1,11 @@
 use crate::engine::Metadata;
-use reality::runir;
-use reality::BincodeContent;
-use reality::Content;
-use reality::Repr;
 use serde::de::DeserializeOwned;
-use serde::Deserialize;
 use serde::Serialize;
-use serde_json::Map;
+use reality::plugin::RequestData;
 
-#[derive(Repr)]
+/// Wrapper over request data the can be used to apply a template to a plugin
 pub struct TemplateData {
-    data: InputData,
+    data: RequestData,
 }
 
 impl TemplateData {
@@ -20,25 +15,33 @@ impl TemplateData {
         plugin: &P,
     ) -> std::io::Result<P> {
         match &self.data {
-            InputData::Json(map) => plugin.apply_template_json_data(map),
-            InputData::Toml(table) => plugin.apply_template_toml_data(table),
+            RequestData::Json(map) => plugin.apply_template_json_data(map),
+            RequestData::Toml(table) => plugin.apply_template_toml_data(table),
+            _ => {
+                Err(std::io::Error::new(std::io::ErrorKind::Unsupported, "Unsupported request data type"))
+            }
         }
+    }
+}
+
+impl From<RequestData> for TemplateData {
+    fn from(value: RequestData) -> Self {
+        Self { data: value }
     }
 }
 
 impl From<serde_json::Value> for TemplateData {
     fn from(value: serde_json::Value) -> Self {
-        value
-            .as_object()
-            .map(|o| TemplateData::from(o.clone()))
-            .unwrap_or(TemplateData::from(Map::new()))
+        Self {
+            data: RequestData::from(value)
+        }
     }
 }
 
 impl From<serde_json::Map<String, serde_json::Value>> for TemplateData {
     fn from(value: serde_json::Map<String, serde_json::Value>) -> Self {
         Self {
-            data: InputData::Json(value),
+            data: RequestData::from(value),
         }
     }
 }
@@ -46,19 +49,7 @@ impl From<serde_json::Map<String, serde_json::Value>> for TemplateData {
 impl From<toml::Table> for TemplateData {
     fn from(value: toml::Table) -> Self {
         Self {
-            data: InputData::Toml(value),
+            data: RequestData::from(value),
         }
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-enum InputData {
-    Json(serde_json::Map<String, serde_json::Value>),
-    Toml(toml::Table),
-}
-
-impl Content for TemplateData {
-    fn state_uuid(&self) -> reality::uuid::Uuid {
-        BincodeContent::new(&self.data).unwrap().state_uuid()
     }
 }

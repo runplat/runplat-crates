@@ -11,7 +11,6 @@ pub use env::LoaderMetadata;
 pub use env::Metadata;
 pub use env::TemplateMap;
 pub use env::TemplateField;
-pub use env::TemplateData;
 pub use load::Load;
 pub use load::LoadBy;
 pub use load::LoadInput;
@@ -60,10 +59,11 @@ impl Engine {
 
 #[cfg(test)]
 mod tests {
+    use http_body_util::BodyExt;
     use toml::toml;
 
     use crate::{
-        engine::{default_create_env, env::EnvBuilder, EventConfig, Metadata, Operation, TemplateData},
+        engine::{default_create_env, env::EnvBuilder, EventConfig, Metadata, Operation},
         plugins::Request,
     };
 
@@ -184,18 +184,39 @@ mod tests {
         let applied = request.apply_template_toml_data(&data).unwrap();
         assert_eq!("https://jsonplaceholder.typicode.com/posts", applied.url().as_str());
 
-        let data = TemplateData::from(data);
-        let applied = data.apply(request).unwrap();
+        let applied = request.apply_template(data).unwrap();
         assert_eq!("https://jsonplaceholder.typicode.com/posts", applied.url().as_str());
 
-        let data = serde_json::json! ({
+        let applied = request.apply_template(serde_json::json! ({
             "url": {
                 "host": "jsonplaceholder.typicode.com",
                 "path": "posts"
             }
-        });
-        let data = TemplateData::from(data);
-        let applied = data.apply(request).unwrap();
+        })).unwrap();
         assert_eq!("https://jsonplaceholder.typicode.com/posts", applied.url().as_str());
+
+        // Send a request to the env for this event address
+        env.requests().send(event.address().commit(), serde_json::json! ({
+            "url": {
+                "host": "jsonplaceholder.typicode.com",
+                "path": "posts"
+            }
+        })).unwrap();
+
+        let event = env
+            .create_event(&EventConfig {
+                event: "test_basic".to_string(),
+                handler: None,
+            })
+            .unwrap();
+
+        let mut item = event.item().clone();
+        event.start().await.unwrap();
+        let req = item.borrow_mut::<Request>().unwrap();
+        let resp = req.take_response().unwrap();
+        let incoming = resp.into_body();
+        let bytes = incoming.collect().await.unwrap();
+        let result = String::from_utf8(bytes.to_bytes().iter().cloned().collect()).unwrap();
+        eprintln!("{}", result);
     }
 }

@@ -32,7 +32,7 @@ impl Operation {
 fn execute_operation(mut binding: Bind<Operation>) -> CallResult {
     // Resolve the current env and root directory
     let (env, root_dir) = binding
-        .plugin()?
+        .receiver()?
         .loader()
         .as_ref()
         .map(|m| m.split_for_env_loader())
@@ -41,13 +41,13 @@ fn execute_operation(mut binding: Bind<Operation>) -> CallResult {
     // Build the engine if it hasn't already been built
     let loader = EnvBuilder::default_env(env).load_env(root_dir?)?;
     let mut engine = Engine::with(loader.state.clone());
-    for e in binding.plugin()?.events.iter() {
+    for e in binding.receiver()?.events.iter() {
         let event = loader.create_event(e)?;
         engine.push(event)?;
     }
-    binding.plugin_mut()?.engine = Some(engine);
+    binding.update()?.engine = Some(engine);
     binding.defer(|i, ct| async move {
-        match i.plugin()?.engine.as_ref() {
+        match i.receiver()?.engine.as_ref() {
             Some(engine) => {
                 for e in engine.events.iter() {
                     let (f, _) = e.fork();

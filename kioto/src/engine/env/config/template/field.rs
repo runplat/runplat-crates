@@ -28,6 +28,12 @@ impl<T> TemplateField<T> {
             None => Err(()),
         }
     }
+
+    /// Returns true if this field is a template string
+    #[inline]
+    pub fn is_template(&self) -> bool {
+        self.template.is_some() && self.inner.is_none()
+    }
 }
 
 impl<T> From<T> for TemplateField<T> {

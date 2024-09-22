@@ -10,7 +10,7 @@ use toml_edit::value;
 use tracing::debug;
 
 /// Define settings settings for configuring a plugin
-#[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Config {
     /// Plugin being loaded
     pub plugin: String,

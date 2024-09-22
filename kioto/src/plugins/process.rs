@@ -21,7 +21,7 @@ pub struct Process {
 impl Plugin for Process {
     fn call(bind: plugin::Bind<Self>) -> CallResult {
         bind.defer(|binding, ct| async move {
-            let p = binding.plugin()?;
+            let p = binding.receiver()?;
             let mut command = if let Some(bin_dir) = p.bin_dir.as_ref() {
                 tokio::process::Command::new(bin_dir.join(&p.program))
             } else {

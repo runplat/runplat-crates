@@ -780,6 +780,7 @@ dependencies = [
  "runplat-macros",
  "semver",
  "serde",
+ "serde_json",
  "tokio",
  "tokio-util",
  "toml",

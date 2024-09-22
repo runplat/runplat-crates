@@ -14,7 +14,7 @@ pub struct Repl<T: Plugin + ReplEval> {
 
 impl<T: Plugin + ReplEval> Plugin for Repl<T> {
     fn call(bind: reality::plugin::Bind<Self>) -> CallResult {
-        if let Some(_target_repl) = bind.plugin()?.target.as_ref().and_then(|t| {
+        if let Some(_target_repl) = bind.receiver()?.target.as_ref().and_then(|t| {
             bind.item()
                 .attributes()
                 .get::<ReplInterface<T>>()
@@ -87,7 +87,7 @@ impl<T: Plugin + ReplEval> Handler for Repl<T> {
         other: reality::plugin::Bind<Self::Target>,
         mut handler: reality::plugin::Bind<Self>,
     ) -> reality::Result<()> {
-        let repl = handler.plugin_mut()?;
+        let repl = handler.update()?;
         repl.target = Some(other);
         Ok(())
     }
@@ -212,7 +212,7 @@ mod tests {
                 Some(m) => match (m.0.as_str(), m.1) {
                     ("echo", mut matches) => {
                         if let Some(message) = matches.remove_many::<String>("message") {
-                            call.clone().plugin_mut()?.message =
+                            call.clone().update()?.message =
                                 message.collect::<Vec<_>>().join(" ");
                             Ok(())
                         } else {

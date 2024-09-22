@@ -5,6 +5,7 @@ mod handler;
 mod state;
 mod thunk;
 mod work;
+mod requests;
 
 pub mod name;
 pub use address::Address;
@@ -13,12 +14,14 @@ pub use call::Call;
 pub use event::Event;
 pub use handler::Handler;
 pub use name::Name;
-use runir::repr::Labels;
+pub use requests::Requests;
+pub use requests::RequestData;
 pub use state::State;
 pub use thunk::HandlerThunk;
 pub use thunk::Thunk;
 pub use work::Work;
 
+use runir::repr::Labels;
 use runir::{store::Item, Content, Resource};
 use semver::Version;
 use serde::de::DeserializeOwned;
@@ -40,6 +43,11 @@ pub trait Plugin: Resource + Content + Sized {
     ///
     /// **Recommendation**: Implementation should just use `env!("CARGO_PKG_VERSION")` to avoid confusion
     fn version() -> Version;
+
+    /// Invoked when a binding is created when the thunk is invoked
+    fn receive(&self, _data: RequestData) -> Option<Self> {
+        None
+    }
 
     /// Invoked when the plugin is being called
     ///
