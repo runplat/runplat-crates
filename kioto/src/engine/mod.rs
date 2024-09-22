@@ -9,8 +9,8 @@ pub use env::EnvBuilder;
 pub use env::EventConfig;
 pub use env::LoaderMetadata;
 pub use env::Metadata;
-pub use env::TemplateMap;
 pub use env::TemplateField;
+pub use env::TemplateMap;
 pub use load::Load;
 pub use load::LoadBy;
 pub use load::LoadInput;
@@ -60,11 +60,12 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use http_body_util::BodyExt;
+    use reality::repr::Labels;
     use toml::toml;
 
     use crate::{
         engine::{default_create_env, env::EnvBuilder, EventConfig, Metadata, Operation},
-        plugins::Request,
+        plugins::{utils::HttpRequestClient, Request},
     };
 
     #[tokio::test]
@@ -164,7 +165,7 @@ mod tests {
         env.build_env("tests/data", ".test").unwrap();
 
         // Load a new environment
-        let env = env
+        let mut env = env
             .load_env(".test")
             .expect("should be able to load test env");
 
@@ -174,7 +175,7 @@ mod tests {
                 handler: None,
             })
             .unwrap();
-            
+
         let request = event.item().borrow::<Request>().unwrap();
         let data: toml::Table = toml! {
             [url]
@@ -182,41 +183,61 @@ mod tests {
             path = "posts"
         };
         let applied = request.apply_template_toml_data(&data).unwrap();
-        assert_eq!("https://jsonplaceholder.typicode.com/posts", applied.url().as_str());
+        assert_eq!(
+            "https://jsonplaceholder.typicode.com/posts",
+            applied.url().as_str()
+        );
 
         let applied = request.apply_template(data).unwrap();
-        assert_eq!("https://jsonplaceholder.typicode.com/posts", applied.url().as_str());
+        assert_eq!(
+            "https://jsonplaceholder.typicode.com/posts",
+            applied.url().as_str()
+        );
 
-        let applied = request.apply_template(serde_json::json! ({
-            "url": {
-                "host": "jsonplaceholder.typicode.com",
-                "path": "posts"
-            }
-        })).unwrap();
-        assert_eq!("https://jsonplaceholder.typicode.com/posts", applied.url().as_str());
+        let applied = request
+            .apply_template(serde_json::json! ({
+                "url": {
+                    "host": "jsonplaceholder.typicode.com",
+                    "path": "posts"
+                }
+            }))
+            .unwrap();
+        assert_eq!(
+            "https://jsonplaceholder.typicode.com/posts",
+            applied.url().as_str()
+        );
 
+        // TODO: Make this more ergonomic
         // Send a request to the env for this event address
-        env.requests().send(event.address().commit(), serde_json::json! ({
-            "url": {
-                "host": "jsonplaceholder.typicode.com",
-                "path": "posts"
-            }
-        })).unwrap();
+        let client = HttpRequestClient::new(|r| Box::pin(async move {
+            let incoming = r.into_body();
+            let bytes = incoming.collect().await.unwrap();
+            let result = String::from_utf8(bytes.to_bytes().iter().cloned().collect()).unwrap();
+            eprintln!("{result}");
+            Ok(())
+        }));
+        let _ = env.state.load(client, Labels::default());
 
-        let event = env
+        env.requests()
+            .send(
+                event.address().commit(),
+                serde_json::json! ({
+                    "url": {
+                        "host": "jsonplaceholder.typicode.com",
+                        "path": "posts"
+                    }
+                }),
+            )
+            .unwrap();
+
+        let mut event = env
             .create_event(&EventConfig {
                 event: "test_basic".to_string(),
                 handler: None,
             })
             .unwrap();
 
-        let mut item = event.item().clone();
+        event.with_handler::<HttpRequestClient>().unwrap();
         event.start().await.unwrap();
-        let req = item.borrow_mut::<Request>().unwrap();
-        let resp = req.take_response().unwrap();
-        let incoming = resp.into_body();
-        let bytes = incoming.collect().await.unwrap();
-        let result = String::from_utf8(bytes.to_bytes().iter().cloned().collect()).unwrap();
-        eprintln!("{}", result);
     }
 }
