@@ -1,5 +1,5 @@
 use std::{collections::BTreeMap, path::PathBuf};
-use reality::plugin::RequestData;
+use reality::plugin::MessageData;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use super::{plugin::LoadSource, TemplateData, TemplateMap};
 
@@ -12,7 +12,7 @@ pub trait Metadata {
         None
     }
 
-    fn apply_template(&self, data: impl Into<RequestData>) -> std::io::Result<Self>
+    fn apply_template(&self, data: impl Into<MessageData>) -> std::io::Result<Self>
     where 
     Self: Serialize + DeserializeOwned 
     {

@@ -214,7 +214,7 @@ pub struct StringBody(String);
 pub struct EmptyBody;
 
 impl Plugin for Request {
-    fn receive(&self, data: reality::plugin::RequestData) -> Option<Self> {
+    fn receive(&self, data: reality::plugin::MessageData) -> Option<Self> {
         self.apply_template(data).ok().inspect(|_| debug!("Applying template to request"))
     }
 

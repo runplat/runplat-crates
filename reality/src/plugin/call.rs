@@ -41,7 +41,7 @@ impl Call {
     #[must_use]
     pub fn bind<P: Plugin>(self) -> Result<Bind<P>> {
         if self.item.is_type::<P>() {
-            let request = self.state.requests().receive(self.item.commit());
+            let request = self.state.messages().receive(self.item.commit());
             let receiver = self
                 .item
                 .borrow::<P>()

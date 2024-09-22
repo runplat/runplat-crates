@@ -6,24 +6,24 @@ use std::{collections::BTreeMap, sync::{Arc, RwLock}};
 /// statefulness away from the Call objects themselves. Instead the call
 /// objects can check state for requests and remove requests from a single location
 #[derive(Clone, Default)]
-pub struct Requests {
-    data: Arc<RwLock<BTreeMap<u64, RequestData>>>
+pub struct Messages {
+    data: Arc<RwLock<BTreeMap<u64, MessageData>>>
 }
 
 /// Enum of supported request data that can be accepted by plugins
-pub enum RequestData {
+pub enum MessageData {
     Toml(toml::Table),
     Json(serde_json::Map<String, serde_json::Value>),
     Item(runir::store::Item),
     Empty,
 }
 
-impl Requests {
+impl Messages {
     /// Sends a request to a dest handle
     /// 
     /// Returns an error if previous data has already been set for the handle, or if in between
     /// acquiring the write lock, an entry was written before this function could write.
-    pub fn send(&self, dest: u64, data: impl Into<RequestData>) -> crate::Result<()> {
+    pub fn send(&self, dest: u64, data: impl Into<MessageData>) -> crate::Result<()> {
         let g = match self.data.read() {
             Ok(g) => g,
             Err(err) => err.into_inner(),
@@ -51,42 +51,42 @@ impl Requests {
 
     /// Receive a request for a handle
     #[inline]
-    pub fn receive(&self, commit: u64) -> RequestData {
+    pub fn receive(&self, commit: u64) -> MessageData {
         let mut g = match self.data.write() {
             Ok(g) => g,
             Err(err) => err.into_inner(),
         };
-        g.remove(&commit).unwrap_or(RequestData::Empty)
+        g.remove(&commit).unwrap_or(MessageData::Empty)
     }
 }
 
-impl From<toml::Table> for RequestData {
+impl From<toml::Table> for MessageData {
     fn from(value: toml::Table) -> Self {
         Self::Toml(value)
     }
 }
 
-impl From<serde_json::Value> for RequestData {
+impl From<serde_json::Value> for MessageData {
     fn from(value: serde_json::Value) -> Self {
         value.as_object().map(|m| {
-            RequestData::Json(m.clone())
-        }).unwrap_or(RequestData::Empty)
+            MessageData::Json(m.clone())
+        }).unwrap_or(MessageData::Empty)
     }
 }
 
-impl From<serde_json::Map<String, serde_json::Value>> for RequestData {
+impl From<serde_json::Map<String, serde_json::Value>> for MessageData {
     fn from(value: serde_json::Map<String, serde_json::Value>) -> Self {
         Self::Json(value)
     }
 }
 
-impl From<runir::store::Item> for RequestData {
+impl From<runir::store::Item> for MessageData {
     fn from(value: runir::store::Item) -> Self {
         Self::Item(value)
     }
 }
 
-impl From<()> for RequestData {
+impl From<()> for MessageData {
     fn from(_: ()) -> Self {
         Self::Empty
     }

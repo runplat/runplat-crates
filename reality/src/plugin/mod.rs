@@ -5,7 +5,7 @@ mod handler;
 mod state;
 mod thunk;
 mod work;
-mod requests;
+mod messages;
 
 pub mod name;
 pub use address::Address;
@@ -14,8 +14,8 @@ pub use call::Call;
 pub use event::Event;
 pub use handler::Handler;
 pub use name::Name;
-pub use requests::Requests;
-pub use requests::RequestData;
+pub use messages::Messages;
+pub use messages::MessageData;
 pub use state::State;
 pub use thunk::HandlerThunk;
 pub use thunk::Thunk;
@@ -45,7 +45,7 @@ pub trait Plugin: Resource + Content + Sized {
     fn version() -> Version;
 
     /// Invoked when a binding is created when the thunk is invoked
-    fn receive(&self, _data: RequestData) -> Option<Self> {
+    fn receive(&self, _data: MessageData) -> Option<Self> {
         None
     }
 

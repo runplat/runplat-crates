@@ -1,4 +1,4 @@
-use super::{thunk::HandlerThunk, Address, Handler, Name, Plugin, Requests};
+use super::{thunk::HandlerThunk, Address, Handler, Name, Plugin, Messages};
 use crate::{
     plugin::{event::Event, Call, Thunk},
     Error, Result,
@@ -25,7 +25,7 @@ pub struct State {
     /// Map of registered plugins
     plugins: BTreeMap<PathBuf, Handle>,
     /// Request data
-    requests: Requests,
+    messages: Messages,
     /// If set to true, will return an error if a plugin being loaded
     /// will overwrite an existing plugin
     disallow_commit_conflicts: bool,
@@ -42,7 +42,7 @@ impl State {
             cancel: CancellationToken::new(),
             handle: tokio::runtime::Handle::current(),
             plugins: BTreeMap::new(),
-            requests: Requests::default(),
+            messages: Messages::default(),
             disallow_commit_conflicts: false
         }
     }
@@ -55,7 +55,7 @@ impl State {
             cancel: CancellationToken::new(),
             handle,
             plugins: BTreeMap::new(),
-            requests: Requests::default(),
+            messages: Messages::default(),
             disallow_commit_conflicts: false
         }
     }
@@ -93,10 +93,10 @@ impl State {
         self.cancel.cancel()
     }
 
-    /// Returns a reference to request state
+    /// Returns a reference to messagge state
     #[inline]
-    pub fn requests(&self) -> &Requests {
-        &self.requests
+    pub fn messages(&self) -> &Messages {
+        &self.messages
     }
 
     /// Registers a plugin from parsing cli arg matches
