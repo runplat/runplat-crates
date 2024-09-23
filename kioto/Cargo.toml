@@ -1,5 +1,7 @@
 [package]
 name = "kioto"
+description = "Framework providing building blocks and tooling for creating an event-driven, plugin-based, application runtime"
+authors = ["juliusl@microsoft.com"]
 version = "0.1.0"
 edition = "2021"
 resolver = "2"
