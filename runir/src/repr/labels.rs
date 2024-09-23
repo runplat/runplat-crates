@@ -1,11 +1,9 @@
-use std::{collections::BTreeMap, ops::Deref};
-
-use crate::Resource;
-
 use super::Repr;
+use crate::{Content, Resource};
+use std::{collections::BTreeMap, ops::{Deref, DerefMut}};
 
 /// Wrapper struct for a ordered label representation
-#[derive(Hash)]
+#[derive(Default, Debug)]
 pub struct Labels(pub BTreeMap<String, String>);
 
 impl Repr for Labels {}
@@ -35,6 +33,23 @@ impl Deref for Labels {
     }
 }
 
+impl DerefMut for Labels {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Content for Labels {
+    fn state_uuid(&self) -> uuid::Uuid {
+        let mut crc = crate::content::crc().digest();
+        for (k, v) in self.0.iter() {
+            crc.update(k.as_bytes());
+            crc.update(v.as_bytes());
+        }
+        uuid::Uuid::from_u64_pair(crc.finalize(), 0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -49,6 +64,26 @@ mod tests {
             .attr(Labels::from(
                 &[("name", "random string"), ("media-type", "rust string")][..],
             ))
+            .commit();
+
+        assert!(handle.cast::<Attributes>().is_some());
+        let attributes = handle.cast::<Attributes>().unwrap();
+
+        let labels = attributes.get::<Labels>().unwrap();
+        assert_eq!("random string", labels.get("name").unwrap());
+        assert_eq!("rust string", labels.get("media-type").unwrap());
+    }
+
+    #[test]
+    fn test_labels_from_btree() {
+        let mut store = Store::new();
+        let mut labels = BTreeMap::new();
+        labels.insert("name".to_string(), "random string".to_string());
+        labels.insert("media-type".to_string(), "rust string".to_string());
+
+        let handle = store
+            .put(String::from("hello world"))
+            .attr(Labels::from(labels))
             .commit();
 
         assert!(handle.cast::<Attributes>().is_some());

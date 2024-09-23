@@ -1,0 +1,9 @@
+-kt-build.plugin = "kioto/plugins.request@0.1.0"
+
+# Test request definition
+url = "https://{{host}}/{{path}}"
+
+
+[-kt-build.templates.url]
+host = ""
+path = ""

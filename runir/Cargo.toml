@@ -2,10 +2,8 @@
 name = "runir"
 version = "0.1.0"
 edition = "2021"
+resolver = "2"
 
 [dependencies]
-futures-lite = "2.3.0"
 uuid = "1.10.0"
-
-[[test]]
-name = "test_item_observation"
+crc = "3.2.1"

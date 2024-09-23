@@ -1,6 +1,6 @@
 use super::*;
 use repo::{Handle, Journal};
-use std::{collections::BTreeMap, fmt::Debug, hash::Hash, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc};
 
 /// Maps attribute typtes to their commit id in the journal
 #[derive(Clone)]
@@ -45,19 +45,16 @@ impl Attributes {
     }
 }
 
-impl Hash for Attributes {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.attrs.hash(state);
-    }
-}
-
-impl Debug for Attributes {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Attributes")
-            .field("attrs", &self.attrs)
-            .finish()
-    }
-}
-
 impl Resource for Attributes {}
 impl Repr for Attributes {}
+
+impl Content for Attributes {
+    fn state_uuid(&self) -> uuid::Uuid {
+        let mut crc = crate::content::crc().digest();
+        for (k, v) in self.attrs.iter() {
+            crc.update(&k.to_be_bytes());
+            crc.update(&v.to_be_bytes());
+        }
+        uuid::Uuid::from_u64_pair(crc.finalize(), 0)
+    }
+}

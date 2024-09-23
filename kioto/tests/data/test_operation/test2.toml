@@ -1,0 +1,4 @@
+-kt-build.plugin = "kioto/plugins.request@0.1.0"
+-kt-build.labels.test = "testval"
+
+url = "https://jsonplaceholder.typicode.com/posts"

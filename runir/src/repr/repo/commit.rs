@@ -1,5 +1,3 @@
-use std::hash::Hash;
-
 use uuid::Uuid;
 
 use super::*;
@@ -26,12 +24,12 @@ impl<'op, R: Repr> Commit<'op, R> {
     /// Hashes the current repr into the current commit uuid
     #[inline]
     #[must_use = "Must call `finish()` to complete the operation"]
-    pub fn hash_repr(mut self) -> Self
+    pub fn digest_repr(mut self) -> Self
     where
-        R: Hash,
+        R: Content,
     {
         let internals = self.repr.internals();
-        let next_lo = internals.link_hash(&self.repr);
+        let next_lo = internals.link_hash_content(&self.repr);
         let (hi, lo) = self.commit.as_u64_pair();
         self.commit = Uuid::from_u64_pair(hi, lo ^ next_lo);
         self
@@ -40,9 +38,9 @@ impl<'op, R: Repr> Commit<'op, R> {
     /// Hashes some state into the current commit uuid
     #[inline]
     #[must_use = "Must call `finish()` to complete the operation"]
-    pub fn hash(mut self, state: impl Hash) -> Self {
+    pub fn digest<C: Content + ?Sized>(mut self, state: &C) -> Self {
         let internals = self.repr.internals();
-        let next_lo = internals.link_hash(state);
+        let next_lo = internals.link_hash_content(state);
         let (hi, lo) = self.commit.as_u64_pair();
         self.commit = Uuid::from_u64_pair(hi, lo ^ next_lo);
         self
@@ -56,7 +54,7 @@ impl<'op, R: Repr> Commit<'op, R> {
         let ident: Identifier = ident.into();
         let next_lo = match ident {
             Identifier::Unit => 0,
-            Identifier::Str(cow) => internals.link_hash_str(&cow),
+            Identifier::Str(cow) => internals.link_hash_str_id(&cow),
             Identifier::Id(id) => internals.link_hash_id(id),
         };
         let (hi, lo) = self.commit.as_u64_pair();
@@ -134,19 +132,23 @@ mod tests {
         assert!(recalled.unwrap().cast::<TyRepr>().is_some());
     }
 
-    #[derive(Hash)]
     struct TestRepr {
         value: usize,
     }
 
+    impl Content for TestRepr {
+        fn state_uuid(&self) -> uuid::Uuid {
+            uuid::Uuid::from_u64_pair(self.value as u64, 0)
+        }
+    }
     impl Resource for TestRepr {}
     impl Repr for TestRepr {}
 
     #[test]
     fn test_commit_hash_repr() {
         let mut repo = Repo::new();
-        let first = repo.commit(TestRepr { value: 0 }).hash_repr().finish();
-        let handle = repo.commit(TestRepr { value: 10 }).hash_repr().finish();
+        let first = repo.commit(TestRepr { value: 0 }).digest_repr().finish();
+        let handle = repo.commit(TestRepr { value: 10 }).digest_repr().finish();
         assert_ne!(first.commit(), handle.commit());
         assert!(handle.cast::<TestRepr>().is_some());
         let recalled = repo.checkout(handle.commit());
@@ -159,13 +161,13 @@ mod tests {
         let mut repo = Repo::new();
         let first = repo
             .commit(TestRepr { value: 0 })
-            .hash_repr()
-            .hash("test123")
+            .digest_repr()
+            .digest(&"test123")
             .finish();
         let handle = repo
             .commit(TestRepr { value: 0 })
-            .hash_repr()
-            .hash("1234test")
+            .digest_repr()
+            .digest(&"1234test")
             .finish();
         assert_ne!(first.commit(), handle.commit());
         assert!(handle.cast::<TestRepr>().is_some());

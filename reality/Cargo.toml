@@ -2,6 +2,22 @@
 name = "reality"
 version = "0.1.0"
 edition = "2021"
+resolver = "2"
 
 [dependencies]
+clap = "4.5.17"
+hex = "0.4.3"
 runir = { path = "../runir" }
+semver = { version = "1.0.23", features = ["serde"] }
+serde = { version = "1.0.210", features = ["derive"] }
+tokio = { version = "1.40.0", features = ["rt", "fs", "macros", "time"] }
+tokio-util = "0.7.12"
+toml = "0.8.19"
+tracing = "0.1.40"
+tracing-test = "0.2.5"
+uuid = { version = "1.10.0", features = ["v4"] }
+bincode = { version = "1.3.3" }
+runplat-macros = { path = "../runplat-macros" }
+serde_json = "1.0.128"
+bytes = "1.7.2"
+thiserror = "1.0.64"

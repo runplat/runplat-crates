@@ -12,10 +12,22 @@
 pub mod repr;
 pub use repr::repo;
 pub mod store;
+pub mod util;
+pub use repr::Repr;
 pub use store::Store;
+
+extern crate self as runir;
 
 /// Trait representing a dynamic resource which can be stored and retrieved
 pub trait Resource: std::any::Any + Send + Sync + 'static {}
+
+/// Trait indicating that the implementing type is "Content" that can be converted into "state"
+pub trait Content {
+    /// Returns a UUID that represents the current content state
+    /// 
+    /// Implementing type must uphold the invariant, that immutable content must always return the same state_uuid.
+    fn state_uuid(&self) -> uuid::Uuid;
+}
 
 impl Resource for String {}
 impl Resource for bool {}
@@ -25,3 +37,32 @@ impl Resource for u32 {}
 impl Resource for usize {}
 impl Resource for f64 {}
 impl Resource for f32 {}
+
+pub mod content {
+    use std::sync::OnceLock;
+    use crc::Crc;
+    use super::*;
+
+    static CRC: OnceLock<Crc<u64>> = OnceLock::new();
+
+    /// Returns a CRC algo for creating non-cryptographic hashes
+    pub fn crc() -> &'static Crc<u64> {
+        CRC.get_or_init(|| Crc::<u64>::new(&crc::CRC_64_MS))
+    }
+    
+    impl<'a> Content for &'a str {
+        fn state_uuid(&self) -> uuid::Uuid {
+            let mut crc = crc().digest();
+            crc.update(self.as_bytes());
+            uuid::Uuid::from_u64_pair(crc.finalize(), 0)
+        }
+    }
+    
+    impl<'a> Content for String {
+        fn state_uuid(&self) -> uuid::Uuid {
+            let mut crc = crc().digest();
+            crc.update(self.as_bytes());
+            uuid::Uuid::from_u64_pair(crc.finalize(), 0)
+        }
+    }
+}

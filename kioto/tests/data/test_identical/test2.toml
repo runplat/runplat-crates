@@ -1,0 +1,3 @@
+-kt-build.plugin = "kioto/plugins.request@0.1.0"
+
+url = "https://jsonplaceholder.typicode.com/posts"
