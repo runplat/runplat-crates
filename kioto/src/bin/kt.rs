@@ -1,11 +1,6 @@
 pub mod cli;
-use cli::{
-    engine::EngineArgs,
-    plugin::{self, Plugins},
-};
-
+use cli::engine::EngineArgs;
 use clap::{Parser, Subcommand};
-use reality::{repr::Labels, State};
 use std::path::PathBuf;
 
 /// `kioto` Utility CLI
@@ -32,10 +27,11 @@ pub struct KiotoUtil {
 /// kioto util commands
 #[derive(Subcommand)]
 enum Commands {
-    /// Interact with plugin system
-    Plugin(plugin::PluginArgs),
     /// Interact with the engine systems
     Engine(EngineArgs),
+    /// Builds an environment and engine config that can be used to load
+    /// kioto engines with
+    Build(cli::build::BuildArgs),
     /// List currently defined plugins and plugin handlers in the current environment
     List,
     /// Creates a new environment
@@ -58,14 +54,10 @@ async fn main() {
         std::fs::create_dir_all(kt_dir).expect("should be able to create .kt dir");
     }
     match cli.command {
-        Commands::Plugin(plugin_args) => match plugin_args.plugin {
-            Plugins::Request(request_args) => {
-                let mut state = State::new();
-                let address = state.load(request_args, Labels::default());
-                eprintln!("request_args loaded - {address}");
-            }
-        },
         Commands::Engine(_) => {}
+        Commands::Build(args) => {
+            args.build().exec();
+        }
         Commands::List => {}
         Commands::NewEnv => {}
         Commands::RemoveEnv => {}
