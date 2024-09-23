@@ -1,5 +1,7 @@
 [package]
 name = "runir"
+description = "Library for building runtime intermediate representations for application objects"
+authors = ["juliusl@microsoft.com"]
 version = "0.1.0"
 edition = "2021"
 resolver = "2"

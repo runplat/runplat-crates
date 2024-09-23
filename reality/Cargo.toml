@@ -1,5 +1,7 @@
 [package]
 name = "reality"
+description = "Framework for building a plugin system with thunk semantics for executing plugin logic"
+authors = ["juliusl@microsoft.com"]
 version = "0.1.0"
 edition = "2021"
 resolver = "2"
