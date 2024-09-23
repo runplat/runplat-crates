@@ -1,0 +1,6 @@
+-kt-build.plugin = "kioto/plugins.process@0.1.0"
+
+program = "cargo"
+args = [
+    "--help"
+]

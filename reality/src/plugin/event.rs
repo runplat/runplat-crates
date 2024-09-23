@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use super::{thunk::HandlerThunk, Address, Call, Handler, Thunk};
+use super::{thunk::HandlerThunk, Address, Call, Handler, MessageData, Thunk};
 use crate::{Error, Result};
 use runir::{repr::Labels, store::Item};
 use tokio_util::sync::CancellationToken;
@@ -53,8 +53,9 @@ impl Event {
     /// Returns an error if the handler's associated Target type does not match
     /// the current event's plugin type
     #[inline]
-    pub fn with_handler<H: Handler>(&mut self) -> Result<&mut Self> {
+    pub fn with_handler<H: Handler>(&mut self, address: Address) -> Result<&mut Self> {
         if self.call.item.is_type::<H::Target>() {
+            self.call.set_handler(address);
             self.handler = Some(Thunk::handler::<H>());
             Ok(self)
         } else {
@@ -67,8 +68,9 @@ impl Event {
     /// Returns an error if the handler's associated Target type does not match the current
     /// event's plugin type
     #[inline]
-    pub fn set_handler(&mut self, handler: &HandlerThunk) -> Result<&mut Self> {
+    pub fn set_handler(&mut self, address: Address, handler: &HandlerThunk) -> Result<&mut Self> {
         if self.call.item.matches_type(handler.target_type()) {
+            self.call.set_handler(address);
             self.handler = Some(handler.thunk());
             Ok(self)
         } else {
@@ -84,6 +86,25 @@ impl Event {
         } else {
             debug!(address = self.address().to_string(), "event_start");
             self.thunk.exec(self.call).await
+        }
+    }
+
+    /// Consumes and starts the event, if the event was assigned a handler, returns
+    /// any messages received by the handler
+    #[inline]
+    pub async fn returns(self) -> Result<MessageData> {
+        if let Some(handler) = self.handler {
+            let handler_info = self.call.handler().cloned();
+            let broker = self.call.state.broker().clone();
+            handler.exec(self.call).await?;
+            let returns = handler_info
+                .map(|h| broker.receive(h.commit()))
+                .unwrap_or_default();
+            Ok(returns)
+        } else {
+            debug!(address = self.address().to_string(), "event_start");
+            self.thunk.exec(self.call).await?;
+            Ok(MessageData::Empty)
         }
     }
 

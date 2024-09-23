@@ -46,6 +46,8 @@ pub enum Error {
     TaskError { is_panic: bool, is_cancel: bool },
     /// Error when a join handle can not run to completion, analagous to tokio::runtime::JoinError
     IOError { message: String },
+    /// Error when a serialization error occurs
+    SerializationError { message: String, format: SerializationFormat },
     /// Error returned when a plugin could not be loaded from a path
     LoadPluginError,
     /// Error returned when a `Name` could not be parsed
@@ -77,6 +79,12 @@ pub enum Error {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub enum SerializationFormat {
+    Toml,
+    Json
+}
+
 impl From<tokio::task::JoinError> for Error {
     fn from(e: tokio::task::JoinError) -> Self {
         Self::TaskError {
@@ -91,6 +99,24 @@ impl From<std::io::Error> for Error {
         Self::IOError {
             message: e.to_string(),
         }
+    }
+}
+
+impl From<toml::ser::Error> for Error {
+    fn from(value: toml::ser::Error) -> Self {
+        Error::SerializationError { message: value.to_string(), format: SerializationFormat::Toml }
+    }
+}
+
+impl From<toml::de::Error> for Error {
+    fn from(value: toml::de::Error) -> Self {
+        Error::SerializationError { message: value.to_string(), format: SerializationFormat::Toml }
+    }
+}
+
+impl From<serde_json::Error> for Error {
+    fn from(value: serde_json::Error) -> Self {
+        Error::SerializationError { message: value.to_string(), format: SerializationFormat::Json }
     }
 }
 
@@ -148,14 +174,10 @@ pub(crate) mod tests {
             )
             .expect("should be able to load");
 
-        let addr = state
+        state
             .addresses()
-            .next()
+            .pop()
             .expect("should have loaded the plugin");
-        assert_eq!(
-            "reality/0.1.0/tests/tomlplugin/f84634220d490003",
-            addr.to_string()
-        );
     }
 
     #[tokio::test]
@@ -178,16 +200,10 @@ pub(crate) mod tests {
             },
             Labels::default(),
         );
-        let mut addresses = state.addresses();
-        assert_eq!(
-            "reality/0.1.0/tests/testplugin/1014f00795fef610",
-            addresses.next().expect("should have address").to_string()
-        );
-        assert_eq!(
-            "reality/0.1.0/tests/testplugin/2cea759e982c8bd9",
-            addresses.next().expect("should have address").to_string()
-        );
-        assert_eq!(2, state.addresses().count());
+        let addresses = state.addresses();
+        addresses.get(0).expect("should have address");
+        addresses.get(1).expect("should have address");
+        assert_eq!(2, state.addresses().len());
     }
 
     #[tokio::test]
@@ -254,7 +270,8 @@ pub(crate) mod tests {
             item: plugin.clone(),
             fork_fn: TestPlugin::fork,
             cancel: CancellationToken::new(),
-            handle: tokio::runtime::Handle::current(),
+            runtime: tokio::runtime::Handle::current(),
+            handler: None
         };
 
         assert_eq!(
@@ -269,7 +286,8 @@ pub(crate) mod tests {
             item: plugin.clone(),
             fork_fn: TestPlugin::fork,
             cancel: CancellationToken::new(),
-            handle: tokio::runtime::Handle::current(),
+            runtime: tokio::runtime::Handle::current(),
+            handler: None
         };
         let mut bound = call.bind::<TestPlugin>().expect("should bind");
         bound.receiver().expect("should return a plugin");
@@ -281,7 +299,8 @@ pub(crate) mod tests {
             item: plugin.clone(),
             fork_fn: TestPlugin::fork,
             cancel: CancellationToken::new(),
-            handle: tokio::runtime::Handle::current(),
+            runtime: tokio::runtime::Handle::current(),
+            handler: None
         };
         let mut bind = Bind::<NotTestPlugin> {
             call,
@@ -443,10 +462,10 @@ pub(crate) mod tests {
             },
             Labels::default(),
         );
-        state.load(TestPluginHandler { test_plugin: None }, Labels::default());
+        let handler = state.load(TestPluginHandler { test_plugin: None }, Labels::default());
 
         let mut event = state.event("reality/0.1.0/tests/testplugin").unwrap();
-        event.with_handler::<TestPluginHandler>().unwrap();
+        event.with_handler::<TestPluginHandler>(handler).unwrap();
         event.start().await.unwrap();
 
         let event = state

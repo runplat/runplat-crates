@@ -1,17 +1,8 @@
-use std::fmt::Debug;
-use std::future::Future;
-use std::marker::PhantomData;
-use std::sync::Arc;
-
+use std::{fmt::Debug, future::Future, marker::PhantomData, sync::Arc};
 use runir::store::Item;
 use tokio_util::sync::CancellationToken;
-
-use super::ForkFn;
-use super::Plugin;
-use super::State;
-use super::Work;
-use crate::Error;
-use crate::Result;
+use super::{Address, Broker, ForkFn, Plugin, State, Work};
+use crate::{Error, Result};
 
 /// Contains state of a plugin invocation call
 ///
@@ -27,7 +18,9 @@ pub struct Call {
     /// Child cancellation token that can be used to cancel this call
     pub(crate) cancel: CancellationToken,
     /// Handle to the backing runtime
-    pub(crate) handle: tokio::runtime::Handle,
+    pub(crate) runtime: tokio::runtime::Handle,
+    /// Address of the handler
+    pub(crate) handler: Option<Address>
 }
 
 impl Call {
@@ -41,7 +34,7 @@ impl Call {
     #[must_use]
     pub fn bind<P: Plugin>(self) -> Result<Bind<P>> {
         if self.item.is_type::<P>() {
-            let request = self.state.messages().receive(self.item.commit());
+            let request = self.state.broker().receive(self.item.commit());
             let receiver = self
                 .item
                 .borrow::<P>()
@@ -67,8 +60,21 @@ impl Call {
             item: (self.fork_fn)(&self.item),
             fork_fn: self.fork_fn.clone(),
             cancel: self.cancel.child_token(),
-            handle: self.handle.clone(),
+            runtime: self.runtime.clone(),
+            handler: self.handler.clone(),
         }
+    }
+
+    /// Sets the call handler
+    #[inline]
+    pub fn set_handler(&mut self, handler: Address) {
+        self.handler = Some(handler);
+    }
+
+    /// Returns the address of the handler
+    #[inline]
+    pub fn handler(&self) -> Option<&Address> {
+        self.handler.as_ref()
     }
 }
 
@@ -112,10 +118,16 @@ impl<P: Plugin> Bind<P> {
         }
     }
 
+    /// Returns message broker
+    #[inline]
+    pub fn broker(&self) -> &Broker {
+        self.call.state.broker()
+    }
+
     /// Returns the current tokio handle
     #[inline]
-    pub fn handle(&self) -> &tokio::runtime::Handle {
-        &self.call.handle
+    pub fn runtime(&self) -> &tokio::runtime::Handle {
+        &self.call.runtime
     }
 
     /// Returns the item bound to this call
@@ -134,7 +146,7 @@ impl<P: Plugin> Bind<P> {
         F: Future<Output = Result<()>> + Send + 'static,
     {
         let binding = self.clone();
-        let handle = self.call.handle.clone();
+        let handle = self.call.runtime.clone();
         let cancel_clone = self.call.cancel.clone();
         let cancel = self.call.cancel;
         Ok(Work {
@@ -157,7 +169,7 @@ impl<P: Plugin> Bind<P> {
         F: Future<Output = Result<()>> + Send + 'static,
     {
         let mut call = self.clone();
-        let handle = self.call.handle.clone();
+        let handle = self.call.runtime.clone();
         let cancel_clone = self.call.cancel.clone();
         let cancel = self.call.cancel;
         Ok(Work {
@@ -180,7 +192,7 @@ impl<P: Plugin> Bind<P> {
         F: Future<Output = Result<()>> + Send + 'static,
     {
         let call = self.clone();
-        let handle = self.call.handle.clone();
+        let handle = self.call.runtime.clone();
         let cancel_clone = self.call.cancel.clone();
         let cancel = self.call.cancel;
         Ok(Work {

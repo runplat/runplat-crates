@@ -1,6 +1,7 @@
 mod client;
 pub use client::Client;
 pub use client::HttpRequestClient;
+pub use client::ProcessClient;
 
 use std::future::Future;
 use clap::{Args, Subcommand};
@@ -55,14 +56,13 @@ impl TaskCancelWrapper {
     pub async fn run<F, O>(
         self,
         fut: F,
-        on_complete: impl FnOnce(O) -> reality::Result<()>,
-    ) -> reality::Result<()>
+    ) -> reality::Result<O>
     where
         F: Future<Output = O>,
     {
         select! {
             o = fut => {
-                on_complete(o)
+                Ok(o)
             },
             _ = self.cancel.cancelled() => {
                 Err(reality::Error::PluginCallCancelled.into())

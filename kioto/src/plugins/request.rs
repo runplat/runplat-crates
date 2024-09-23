@@ -92,21 +92,22 @@ impl Plugin for RequestArgs {
                         .await
                         .map_err(|e| binding.plugin_call_error(e.to_string()))?;
 
-                    with_cancel(ct)
-                        .run(req.client()(request), |o| match o {
-                            Ok(resp) => {
-                                if req.response.is_some() {
-                                    Err(binding.plugin_call_error(
-                                        "Response was already set and has not been handled",
-                                    ))
-                                } else {
-                                    req.response = Some(resp);
-                                    Ok(())
-                                }
+                    let o = with_cancel(ct)
+                        .run(req.client()(request))
+                        .await?;
+                    match o {
+                        Ok(resp) => {
+                            if req.response.is_some() {
+                                Err(binding.plugin_call_error(
+                                    "Response was already set and has not been handled",
+                                ))
+                            } else {
+                                req.response = Some(resp);
+                                Ok(())
                             }
-                            Err(err) => Err(binding.plugin_call_error(err.to_string())),
-                        })
-                        .await
+                        }
+                        Err(err) => Err(binding.plugin_call_error(err.to_string())),
+                    }
                 } else {
                     Err(binding.plugin_call_error("Request was not loaded"))
                 }

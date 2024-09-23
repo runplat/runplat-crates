@@ -9,7 +9,7 @@ pub use config::TemplateField;
 
 mod build;
 pub use build::Builder as EnvBuilder;
-use reality::plugin::Messages;
+use reality::plugin::Broker;
 
 use super::{Load, LoadInput, Operation};
 use crate::plugins::{Process, Request, RequestArgs};
@@ -129,8 +129,8 @@ impl Env {
 
     /// Returns access to requests state
     #[inline]
-    pub fn requests(&self) -> &Messages {
-        self.state.messages()
+    pub fn broker(&self) -> &Broker {
+        self.state.broker()
     }
 }
 

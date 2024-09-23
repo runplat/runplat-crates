@@ -26,7 +26,7 @@ impl<T: Plugin + ReplEval> Plugin for Repl<T> {
                     let (repl, target_bind) = _target_repl.clone();
                     // READ
                     let read_bind = target_bind.clone();
-                    let read = target_bind.handle().clone();
+                    let read = target_bind.runtime().clone();
                     let read = read.spawn_blocking(move || {
                         if let Some(Ok(line)) = std::io::stdin().lines().next() {
                             // EVAL
@@ -52,12 +52,8 @@ impl<T: Plugin + ReplEval> Plugin for Repl<T> {
                                     Err(reality::Error::PluginCallCancelled)
                                 }
                             },
-                            |r| match r {
-                                Ok(_) => Ok(()),
-                                _ => Err(reality::Error::PluginCallCancelled),
-                            },
                         )
-                        .await;
+                        .await?;
 
                     // LOOP -- TODO, better error handling
                     if result.is_err() {
@@ -156,10 +152,10 @@ mod tests {
             },
             Labels::default(),
         );
-        let _ = state.load_handler(Repl::<Echo>::default(), Labels::default());
+        let handler = state.load_handler(Repl::<Echo>::default(), Labels::default());
 
         let mut event = state.event(&address).unwrap();
-        event.with_handler::<Repl<Echo>>().unwrap();
+        event.with_handler::<Repl<Echo>>(handler).unwrap();
         event.start().await.unwrap();
     }
 

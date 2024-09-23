@@ -21,8 +21,9 @@ pub trait Handler: Plugin {
     fn wrap_thunk(call: Call) -> Result<Work> {
         // Receives the original call to plugin R and initiates the work
         let work = Self::Target::thunk(call.clone())?;
+        let handler = call.handler().and_then(|a| call.state.find_plugin(a));
         // Finds the resource of the handler
-        match call.state.find_plugin(Self::name().path()) {
+        match handler.or_else(|| call.state.find_plugin(Self::name().path())) {
             Some(handler) => {
                 debug!("Found handler resource");
                 let handler_call = Call {
@@ -30,7 +31,8 @@ pub trait Handler: Plugin {
                     item: handler.clone(),
                     fork_fn: Self::fork,
                     cancel: call.state.cancel.child_token(),
-                    handle: call.handle.clone(),
+                    runtime: call.runtime.clone(),
+                    handler: None,
                 };
                 let binding = handler_call.bind::<Self>()?;
                 binding.defer(|b, _| async move {

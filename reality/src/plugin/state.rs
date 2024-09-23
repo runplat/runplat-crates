@@ -1,4 +1,4 @@
-use super::{thunk::HandlerThunk, Address, Handler, Name, Plugin, Messages};
+use super::{thunk::HandlerThunk, Address, Handler, Name, Plugin, Broker};
 use crate::{
     plugin::{event::Event, Call, Thunk},
     Error, Result,
@@ -6,12 +6,14 @@ use crate::{
 use clap::ArgMatches;
 use runir::{repo::Handle, repr::{Attributes, Labels}, store::Item, Store};
 use serde::de::DeserializeOwned;
-use std::{collections::BTreeMap, future::Future, ops::Deref, path::PathBuf, pin::Pin};
+use std::{collections::BTreeMap, future::Future, ops::Deref, path::PathBuf, pin::Pin, sync::{Arc, RwLock}};
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
 /// Type-alias for a boxed future
 type BoxFuture = Pin<Box<dyn Future<Output = Result<()>>>>;
+
+type PluginMap = std::sync::Arc<std::sync::RwLock<BTreeMap<PathBuf, Handle>>>;
 
 /// State contains manages registering and calling plugins
 #[derive(Clone)]
@@ -23,9 +25,9 @@ pub struct State {
     /// Handle to runtime to create work from state
     handle: tokio::runtime::Handle,
     /// Map of registered plugins
-    plugins: BTreeMap<PathBuf, Handle>,
-    /// Request data
-    messages: Messages,
+    plugins: PluginMap,
+    /// Message system
+    messages: Broker,
     /// If set to true, will return an error if a plugin being loaded
     /// will overwrite an existing plugin
     disallow_commit_conflicts: bool,
@@ -41,8 +43,8 @@ impl State {
             store: runir::Store::new(),
             cancel: CancellationToken::new(),
             handle: tokio::runtime::Handle::current(),
-            plugins: BTreeMap::new(),
-            messages: Messages::default(),
+            plugins: Arc::new(RwLock::new(BTreeMap::new())),
+            messages: Broker::default(),
             disallow_commit_conflicts: false
         }
     }
@@ -54,8 +56,8 @@ impl State {
             store: runir::Store::new(),
             cancel: CancellationToken::new(),
             handle,
-            plugins: BTreeMap::new(),
-            messages: Messages::default(),
+            plugins: Arc::new(RwLock::new(BTreeMap::new())),
+            messages: Broker::default(),
             disallow_commit_conflicts: false
         }
     }
@@ -95,7 +97,7 @@ impl State {
 
     /// Returns a reference to messagge state
     #[inline]
-    pub fn messages(&self) -> &Messages {
+    pub fn broker(&self) -> &Broker {
         &self.messages
     }
 
@@ -137,8 +139,14 @@ impl State {
         }
         let handle = P::load(P::must_load(put)).commit();
         let address = name.path().join(hex::encode(handle.commit().to_be_bytes()));
-        self.plugins.insert(name.path().clone(), handle.clone());
-        if let Some(_) = self.plugins.insert(
+
+        let mut plugins = match self.plugins.write() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
+
+        plugins.insert(name.path().clone(), handle.clone());
+        if let Some(_) = plugins.insert(
             address,
             handle.clone(),
         ).filter(|_| self.disallow_commit_conflicts) {
@@ -186,8 +194,12 @@ impl State {
             put = put.label(k, v);
         }
         let handle = H::load(H::must_load(put)).commit();
-        self.plugins.insert(name.path().clone(), handle.clone());
-        self.plugins.insert(
+        let mut plugins = match self.plugins.write() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
+        plugins.insert(name.path().clone(), handle.clone());
+        plugins.insert(
             name.path().join(hex::encode(handle.commit().to_be_bytes())),
             handle.clone(),
         );
@@ -228,7 +240,11 @@ impl State {
     /// Creates a new "Event" for a plugin
     pub fn event(&self, plugin: impl Into<PathBuf>) -> Result<Event> {
         let path = plugin.into();
-        match self.plugins.get(&path).and_then(|h| {
+        let plugins = match self.plugins.read() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
+        match plugins.get(&path).and_then(|h| {
             let id = h.commit();
             self.store
                 .item(id)
@@ -253,7 +269,8 @@ impl State {
                     item: item.clone(),
                     fork_fn: thunk.fork_fn(),
                     cancel: cancel.clone(),
-                    handle: self.handle.clone(),
+                    runtime: self.handle.clone(),
+                    handler: None
                 };
                 let labels = item.attributes().get::<Labels>();
 
@@ -273,8 +290,11 @@ impl State {
     #[inline]
     pub fn handler(&self, plugin: impl Into<PathBuf>) -> Result<HandlerThunk> {
         let path = plugin.into();
-        match self
-            .plugins
+        let plugins = match self.plugins.read() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
+        match plugins
             .get(&path)
             .and_then(|h| h.cast::<Attributes>().and_then(|a| a.get::<HandlerThunk>()))
         {
@@ -287,7 +307,11 @@ impl State {
     #[inline]
     pub fn find_plugin(&self, plugin: impl Into<PathBuf>) -> Option<&Item> {
         let path = plugin.into();
-        self.plugins.get(&path).and_then(|h| {
+        let plugins = match self.plugins.read() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
+        plugins.get(&path).and_then(|h| {
             let id = h.commit();
             self.store.item(id)
         })
@@ -295,8 +319,12 @@ impl State {
 
     /// Returns each unique address stored in state
     #[inline]
-    pub fn addresses(&self) -> impl Iterator<Item = Address> + '_ {
-        self.plugins
+    pub fn addresses(&self) -> Vec<Address> {
+        let plugins = match self.plugins.read() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
+        plugins
             .iter()
             .filter(|(p, _)| p.ancestors().count() > 5)
             .filter_map(|(_, h)| {
@@ -310,5 +338,6 @@ impl State {
                 name: name.deref().clone(),
                 commit: id,
             })
+            .collect::<Vec<Address>>()
     }
 }

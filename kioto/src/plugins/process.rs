@@ -1,8 +1,9 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, process::Output};
 
 use reality::*;
 use runplat_macros::kt_metadata;
 use serde::{Deserialize, Serialize};
+use tracing::debug;
 
 use super::utils::with_cancel;
 
@@ -16,11 +17,27 @@ pub struct Process {
     args: Vec<String>,
     /// Bin dir to find the program from
     bin_dir: Option<PathBuf>,
+    /// Output of the process
+    #[serde(skip)]
+    output: Option<Output>
+}
+
+impl Process {
+    /// Takes the process output
+    #[inline]
+    pub fn take_output(&mut self) -> Option<Output> {
+        self.output.take()
+    }
 }
 
 impl Plugin for Process {
     fn call(bind: plugin::Bind<Self>) -> CallResult {
-        bind.defer(|binding, ct| async move {
+        if bind.receiver()?.output.is_some() {
+            debug!("Process output has not been handled");
+            return bind.skip();
+        }
+
+        bind.defer(|mut binding, ct| async move {
             let p = binding.receiver()?;
             let mut command = if let Some(bin_dir) = p.bin_dir.as_ref() {
                 tokio::process::Command::new(bin_dir.join(&p.program))
@@ -34,21 +51,20 @@ impl Plugin for Process {
                 command.args(args);
             }
 
-            with_cancel(ct)
-                .run(command.status(), |s| {
-                    let status = s?;
-                    if status.success() {
-                        Ok(())
-                    } else {
-                        Err(binding.plugin_call_error(format!(
-                            "process exited unsuccessfully, status code: {}",
-                            status.code().unwrap_or(1)
-                        )))
-                    }
-                })
-                .await?;
-
-            Ok(())
+            let output = with_cancel(ct)
+                .run(command.output())
+                .await??;
+            // eprintln!("Calling command {output:?}");
+            let status = output.status;
+            binding.update()?.output = Some(output);
+            if status.success() {
+                Ok(())
+            } else {
+                Err(binding.plugin_call_error(format!(
+                    "process exited unsuccessfully, status code: {}",
+                    status.code().unwrap_or(1)
+                )))
+            }
         })
     }
 

@@ -116,10 +116,10 @@ impl Config {
     ///
     /// Returns an error if the plugin could not found or event created
     #[inline]
-    pub fn event(&self, name: &str, loader: &Env) -> reality::Result<Event> {
+    pub fn event(&self, name: &str, loader: &Env) -> reality::Result<(Address, Event)> {
         self.loaded_plugins
             .get(name)
-            .map(|p| loader.state.event(p))
+            .map(|p| loader.state.event(p).map(|e| (p.clone(), e)))
             .unwrap_or(Err(reality::Error::PluginNotFound))
     }
 
@@ -127,10 +127,10 @@ impl Config {
     ///
     /// Returns an error if the plugin could not found
     #[inline]
-    pub fn handler(&self, name: &str, loader: &Env) -> reality::Result<HandlerThunk> {
+    pub fn handler(&self, name: &str, loader: &Env) -> reality::Result<(Address, HandlerThunk)> {
         self.loaded_handlers
             .get(name)
-            .map(|p| loader.state.handler(p))
+            .map(|p| loader.state.handler(p).map(|h| (p.clone(), h)))
             .unwrap_or(Err(reality::Error::PluginNotFound))
     }
 
@@ -140,11 +140,11 @@ impl Config {
     #[inline]
     pub fn configure_event(&self, config: &EventConfig, loader: &Env) -> reality::Result<Event> {
         match config.split_for_lookup() {
-            (event, None) => self.event(&event, loader),
+            (event, None) => self.event(&event, loader).map(|(_, e)| e),
             (event, Some(handler)) => {
-                let mut event = self.event(&event, loader)?;
-                let handler = self.handler(&handler, loader)?;
-                event.set_handler(&handler)?;
+                let (_, mut event) = self.event(&event, loader)?;
+                let (address, handler) = self.handler(&handler, loader)?;
+                event.set_handler(address, &handler)?;
                 Ok(event)
             }
         }

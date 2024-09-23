@@ -1,45 +1,54 @@
-use std::{future::Future, pin::Pin};
+use std::{future::Future, pin::Pin, process::Output};
 
-use crate::plugins::Request;
+use crate::plugins::{Process, Request};
 use hyper::body::Incoming;
-use reality::{plugin::Handler, Content, Plugin, Resource, Uuid};
-
+use reality::{plugin::{Handler, MessageData}, Content, Plugin, Resource, Uuid, Version};
 use super::with_cancel;
 
+/// Type-alias for a process client
+pub type ProcessClient = Client<Output>;
+
+/// Type-alias for an http request client
 pub type HttpRequestClient = Client<IncomingResponse>;
 
+/// Type-alias for an incoming response from an http request
 pub type IncomingResponse = hyper::Response<Incoming>;
 
-pub type ClientFn<R> = Box<
-    dyn Fn(R) -> Pin<Box<dyn Future<Output = reality::Result<()>> + Send>> + Send + Sync + 'static,
+/// Type-alias for a client return function
+pub type ReturnFn<R> = Box<
+    dyn Fn(R) -> Pin<Box<dyn Future<Output = reality::Result<MessageData>> + Send>> + Send + Sync + 'static,
 >;
 
 /// Utility for constructing a "client" type from an environment
 pub struct Client<R> {
-    next: ClientFn<R>,
+    /// Called after the handler has a result set, output is sent to the handler's commit id
+    returns: ReturnFn<R>,
+    /// Result of the target plugin this client is attached to
     result: Option<R>,
 }
 
 impl<R> Client<R> {
-    /// Creates a new client from function
+    /// Creates a new client with function
     #[inline]
     pub fn new(
-        next: impl Fn(R) -> Pin<Box<dyn Future<Output = reality::Result<()>> + Send>>
+        next: impl Fn(R) -> Pin<Box<dyn Future<Output = reality::Result<MessageData>> + Send>>
             + Send
             + Sync
             + 'static,
     ) -> Self {
-        Self { next: Box::new(next), result: None }
+        Self { returns: Box::new(next), result: None }
     }
 }
 
-impl Plugin for Client<IncomingResponse> {
+impl<R: Send + Sync + 'static> Plugin for Client<R> {
     fn call(bind: reality::plugin::Bind<Self>) -> reality::CallResult {
         bind.defer(|mut binding, ct| async move {
             if let Some(r) = binding.update()?.result.take() {
-                with_cancel(ct)
-                    .run((binding.receiver()?.next)(r), |r| r)
-                    .await
+                let returns = with_cancel(ct)
+                    .run((binding.receiver()?.returns)(r))
+                    .await??;
+                let reply_to = binding.item().commit();
+                binding.broker().send(reply_to, returns)
             } else {
                 Err(reality::Error::PluginCallSkipped)
             }
@@ -47,7 +56,7 @@ impl Plugin for Client<IncomingResponse> {
     }
 
     fn version() -> reality::Version {
-        reality::Version::new(0, 1, 0)
+        Version::parse(env!("CARGO_PKG_VERSION")).expect("should be successful because cargo would not compile")
     }
 }
 
@@ -59,6 +68,18 @@ impl Handler for Client<IncomingResponse> {
         mut handler: reality::plugin::Bind<Self>,
     ) -> reality::Result<()> {
         handler.update()?.result = other.update()?.take_response();
+        Ok(())
+    }
+}
+
+impl Handler for Client<std::process::Output> {
+    type Target = Process;
+
+    fn handle(
+        mut other: reality::plugin::Bind<Self::Target>,
+        mut handler: reality::plugin::Bind<Self>,
+    ) -> reality::Result<()> {
+        handler.update()?.result = other.update()?.take_output();
         Ok(())
     }
 }

@@ -51,7 +51,7 @@ fn execute_operation(mut binding: Bind<Operation>) -> CallResult {
             Some(engine) => {
                 for e in engine.events.iter() {
                     let (f, _) = e.fork();
-                    with_cancel(ct.clone()).run(f.start(), |r| r).await?;
+                    with_cancel(ct.clone()).run(f.start()).await??;
                 }
                 Ok(())
             }

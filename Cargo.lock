@@ -774,6 +774,7 @@ name = "reality"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "bytes",
  "clap",
  "hex",
  "runir",

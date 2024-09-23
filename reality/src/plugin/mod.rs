@@ -14,7 +14,7 @@ pub use call::Call;
 pub use event::Event;
 pub use handler::Handler;
 pub use name::Name;
-pub use messages::Messages;
+pub use messages::Broker;
 pub use messages::MessageData;
 pub use state::State;
 pub use thunk::HandlerThunk;
