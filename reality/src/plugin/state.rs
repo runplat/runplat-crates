@@ -1,12 +1,24 @@
-use super::{thunk::HandlerThunk, Address, Handler, Name, Plugin, Broker};
+use super::{thunk::HandlerThunk, Address, Broker, Handler, Name, Plugin};
 use crate::{
     plugin::{event::Event, Call, Thunk},
     Error, Result,
 };
 use clap::ArgMatches;
-use runir::{repo::Handle, repr::{Attributes, Labels}, store::Item, Store};
+use runir::{
+    repo::Handle,
+    repr::{Attributes, Labels},
+    store::Item,
+    Store,
+};
 use serde::de::DeserializeOwned;
-use std::{collections::BTreeMap, future::Future, ops::Deref, path::PathBuf, pin::Pin, sync::{Arc, RwLock}};
+use std::{
+    collections::BTreeMap,
+    future::Future,
+    ops::Deref,
+    path::PathBuf,
+    pin::Pin,
+    sync::{Arc, RwLock},
+};
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
@@ -45,7 +57,7 @@ impl State {
             handle: tokio::runtime::Handle::current(),
             plugins: Arc::new(RwLock::new(BTreeMap::new())),
             messages: Broker::default(),
-            disallow_commit_conflicts: false
+            disallow_commit_conflicts: false,
         }
     }
 
@@ -58,7 +70,7 @@ impl State {
             handle,
             plugins: Arc::new(RwLock::new(BTreeMap::new())),
             messages: Broker::default(),
-            disallow_commit_conflicts: false
+            disallow_commit_conflicts: false,
         }
     }
 
@@ -106,7 +118,7 @@ impl State {
     pub fn load_by_args<P: Plugin + clap::FromArgMatches>(
         &mut self,
         matches: &ArgMatches,
-        labels: Labels
+        labels: Labels,
     ) -> std::io::Result<Address> {
         let plugin = P::from_arg_matches(matches)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()))?;
@@ -119,7 +131,7 @@ impl State {
     pub fn load_by_toml<P: Plugin + DeserializeOwned>(
         &mut self,
         toml: &str,
-        labels: Labels
+        labels: Labels,
     ) -> std::io::Result<Address> {
         let plugin = toml::from_str::<P>(toml)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.message()))?;
@@ -146,10 +158,10 @@ impl State {
         };
 
         plugins.insert(name.path().clone(), handle.clone());
-        if let Some(_) = plugins.insert(
-            address,
-            handle.clone(),
-        ).filter(|_| self.disallow_commit_conflicts) {
+        if let Some(_) = plugins
+            .insert(address, handle.clone())
+            .filter(|_| self.disallow_commit_conflicts)
+        {
             todo!("Commit conflicts disallowed")
         }
 
@@ -164,7 +176,7 @@ impl State {
     pub fn load_handler_by_args<H: Handler + clap::FromArgMatches>(
         &mut self,
         matches: &ArgMatches,
-        labels: Labels
+        labels: Labels,
     ) -> std::io::Result<Address> {
         let plugin = H::from_arg_matches(matches)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()))?;
@@ -177,7 +189,7 @@ impl State {
     pub fn load_handler_by_toml<H: Handler + DeserializeOwned>(
         &mut self,
         toml: &str,
-        labels: Labels
+        labels: Labels,
     ) -> std::io::Result<Address> {
         let plugin = toml::from_str::<H>(toml)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.message()))?;
@@ -270,7 +282,7 @@ impl State {
                     fork_fn: thunk.fork_fn(),
                     cancel: cancel.clone(),
                     runtime: self.handle.clone(),
-                    handler: None
+                    handler: None,
                 };
                 let labels = item.attributes().get::<Labels>();
 

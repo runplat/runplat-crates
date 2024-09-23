@@ -4,11 +4,11 @@ use serde::Serialize;
 use std::str::FromStr;
 use std::{borrow::Cow, collections::BTreeSet, fmt::Display, path::PathBuf};
 
-pub use utils::LATEST_VERSION;
 pub use utils::parse_name;
+pub use utils::LATEST_VERSION;
 
-use crate::BincodeContent;
 use super::{Address, Plugin};
+use crate::BincodeContent;
 
 /// Type-alias for a Plugin reference string
 pub type PluginRef<'a> = Cow<'a, str>;
@@ -112,7 +112,10 @@ impl Name {
     /// Returns an address w/ commit
     #[inline]
     pub fn address(&self, commit: u64) -> Address {
-        Address { name: self.clone(), commit }
+        Address {
+            name: self.clone(),
+            commit,
+        }
     }
 
     /// Initializes matchers for this name
@@ -158,8 +161,8 @@ impl FromStr for Name {
 }
 
 pub mod utils {
-    use runir::util::*;
     use crate::Error;
+    use runir::util::*;
     use semver::{BuildMetadata, Prerelease, Version};
     use std::{collections::BTreeSet, path::PathBuf, str::FromStr};
 
@@ -255,10 +258,16 @@ pub mod utils {
 
         let name = crate::tests::TestPlugin::name();
         let full_name = parse_name(&name.full_plugin_ref());
-        assert_eq!("reality/0.1.0/tests/testplugin", full_name.unwrap().path().to_string_lossy());
+        assert_eq!(
+            "reality/0.1.0/tests/testplugin",
+            full_name.unwrap().path().to_string_lossy()
+        );
 
         let name = parse_name(&name.plugin_ref());
-        assert_eq!("reality/0.0.0/tests/testplugin", name.unwrap().path().to_string_lossy());
+        assert_eq!(
+            "reality/0.0.0/tests/testplugin",
+            name.unwrap().path().to_string_lossy()
+        );
     }
 
     #[test]

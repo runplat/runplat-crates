@@ -30,7 +30,11 @@ impl Thunk {
     /// Returns a thunk for a plugin handler implementation
     #[inline]
     pub fn handler<H: Handler>() -> Self {
-        Self { name: H::name(), thunk: H::wrap_thunk, fork: H::fork }
+        Self {
+            name: H::name(),
+            thunk: H::wrap_thunk,
+            fork: H::fork,
+        }
     }
 
     /// Returns the thunk fn

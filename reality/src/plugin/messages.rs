@@ -1,18 +1,21 @@
-use std::{collections::BTreeMap, sync::{Arc, RwLock}};
 use bytes::Bytes;
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, RwLock},
+};
 use tracing::debug;
 
-/// Type-alias for a json map 
+/// Type-alias for a json map
 pub type JsonMap = serde_json::Map<String, serde_json::Value>;
 
 /// Struct containing request state for plugin calls
-/// 
+///
 /// This is stored centrally w/ a State object so to consolidate,
 /// statefulness away from the Call objects themselves. Instead the call
 /// objects can check state for requests and remove requests from a single location
 #[derive(Clone, Default)]
 pub struct Broker {
-    data: Arc<RwLock<BTreeMap<u64, MessageData>>>
+    data: Arc<RwLock<BTreeMap<u64, MessageData>>>,
 }
 /// Enum of supported request data that can be accepted by plugins
 #[derive(Default)]
@@ -36,7 +39,7 @@ impl MessageData {
     pub fn is_empty(&self) -> bool {
         matches!(self, MessageData::Empty)
     }
-    
+
     /// Returns true if the message data is json
     #[inline]
     pub fn is_json(&self) -> bool {
@@ -104,7 +107,7 @@ impl MessageData {
 
 impl Broker {
     /// Sends a request to a dest handle
-    /// 
+    ///
     /// Returns an error if previous data has already been set for the handle, or if in between
     /// acquiring the write lock, an entry was written before this function could write.
     pub fn send(&self, dest: u64, data: impl Into<MessageData>) -> crate::Result<()> {
@@ -114,9 +117,9 @@ impl Broker {
             Err(err) => err.into_inner(),
         };
 
-       if g.contains_key(&dest) {
+        if g.contains_key(&dest) {
             Err(crate::Error::PreviousUnhandledRequest)
-       } else {
+        } else {
             drop(g);
             let mut g = match self.data.write() {
                 Ok(g) => g,
@@ -131,7 +134,7 @@ impl Broker {
             } else {
                 Ok(())
             }
-       }
+        }
     }
 
     /// Receive a request for a handle
@@ -159,7 +162,7 @@ impl From<serde_json::Value> for MessageData {
                 let mut map = serde_json::Map::new();
                 map.insert("[]".to_string(), vec.into());
                 MessageData::Json(map)
-            },
+            }
             serde_json::Value::Object(map) => MessageData::Json(map),
             _ => MessageData::Empty,
         }

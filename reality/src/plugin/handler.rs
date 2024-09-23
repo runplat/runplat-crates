@@ -55,15 +55,17 @@ pub trait Handler: Plugin {
                     }
                 })
             }
-            None => {
-                Ok(work)
-            }
+            None => Ok(work),
         }
     }
 
     /// Loads this plugin by toml
     #[inline]
-    fn load_handler_by_toml(state: &mut State, toml: &str, labels: Labels) -> std::io::Result<Address>
+    fn load_handler_by_toml(
+        state: &mut State,
+        toml: &str,
+        labels: Labels,
+    ) -> std::io::Result<Address>
     where
         Self: DeserializeOwned,
     {
@@ -72,7 +74,11 @@ pub trait Handler: Plugin {
 
     /// Loads this plugin by cli args
     #[inline]
-    fn load_handler_by_args(state: &mut State, args: &ArgMatches, labels: Labels) -> std::io::Result<Address>
+    fn load_handler_by_args(
+        state: &mut State,
+        args: &ArgMatches,
+        labels: Labels,
+    ) -> std::io::Result<Address>
     where
         Self: FromArgMatches,
     {

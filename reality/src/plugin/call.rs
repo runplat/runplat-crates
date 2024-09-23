@@ -1,8 +1,8 @@
-use std::{fmt::Debug, future::Future, marker::PhantomData, sync::Arc};
-use runir::store::Item;
-use tokio_util::sync::CancellationToken;
 use super::{Address, Broker, ForkFn, Plugin, State, Work};
 use crate::{Error, Result};
+use runir::store::Item;
+use std::{fmt::Debug, future::Future, marker::PhantomData, sync::Arc};
+use tokio_util::sync::CancellationToken;
 
 /// Contains state of a plugin invocation call
 ///
@@ -20,12 +20,12 @@ pub struct Call {
     /// Handle to the backing runtime
     pub(crate) runtime: tokio::runtime::Handle,
     /// Address of the handler
-    pub(crate) handler: Option<Address>
+    pub(crate) handler: Option<Address>,
 }
 
 impl Call {
     /// Consumes this call context and binds a plugin to the current call,
-    /// 
+    ///
     /// Will receive any pending requests from state and call Plugin::receive in order to set the
     /// receiver binding on the plugin.
     ///
@@ -94,7 +94,7 @@ pub struct Bind<P: Plugin> {
 
 impl<P: Plugin> Bind<P> {
     /// Returns a reference to the plugin's "receiver"
-    /// 
+    ///
     /// A receiver is always immutable, so if the receiver field on the binding is set, that version of
     /// plugin state will be returned instead of the base item
     ///

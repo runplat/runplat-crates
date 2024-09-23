@@ -6,7 +6,7 @@ use super::Thunk;
 use runir::*;
 
 /// Handler thunk type
-/// 
+///
 /// Can be used to set the handler thunk on an event without the need for generics
 #[derive(Clone)]
 pub struct HandlerThunk {

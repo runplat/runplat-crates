@@ -14,7 +14,7 @@ pub struct Address {
 }
 
 impl Address {
-    /// Commit id of this address 
+    /// Commit id of this address
     #[inline]
     pub fn commit(&self) -> u64 {
         self.commit

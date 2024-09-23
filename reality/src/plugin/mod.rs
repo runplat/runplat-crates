@@ -2,10 +2,10 @@ mod address;
 mod call;
 mod event;
 mod handler;
+mod messages;
 mod state;
 mod thunk;
 mod work;
-mod messages;
 
 pub mod name;
 pub use address::Address;
@@ -13,20 +13,20 @@ pub use call::Bind;
 pub use call::Call;
 pub use event::Event;
 pub use handler::Handler;
-pub use name::Name;
 pub use messages::Broker;
 pub use messages::MessageData;
+pub use name::Name;
 pub use state::State;
 pub use thunk::HandlerThunk;
 pub use thunk::Thunk;
 pub use work::Work;
 
+use crate::CallResult;
+use clap::{ArgMatches, FromArgMatches};
 use runir::repr::Labels;
 use runir::{store::Item, Content, Resource};
 use semver::Version;
 use serde::de::DeserializeOwned;
-use clap::{ArgMatches, FromArgMatches};
-use crate::CallResult;
 
 /// Type-alias for the a thunk function
 pub type ThunkFn = fn(Call) -> CallResult;
@@ -69,7 +69,11 @@ pub trait Plugin: Resource + Content + Sized {
 
     /// Loads this plugin by cli args
     #[inline]
-    fn load_by_args(state: &mut State, args: &ArgMatches, labels: Labels) -> std::io::Result<Address>
+    fn load_by_args(
+        state: &mut State,
+        args: &ArgMatches,
+        labels: Labels,
+    ) -> std::io::Result<Address>
     where
         Self: FromArgMatches,
     {

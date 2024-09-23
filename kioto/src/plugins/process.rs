@@ -5,6 +5,8 @@ use runplat_macros::kt_metadata;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
+use crate::engine::Metadata;
+
 use super::utils::with_cancel;
 
 /// Plugin for starting a process
@@ -15,6 +17,9 @@ pub struct Process {
     program: String,
     /// Program arguments
     args: Vec<String>,
+    /// Env variables
+    #[serde(default)]
+    env: Vec<[String; 2]>,
     /// Bin dir to find the program from
     bin_dir: Option<PathBuf>,
     /// Output of the process
@@ -31,6 +36,10 @@ impl Process {
 }
 
 impl Plugin for Process {
+    fn receive(&self, data: plugin::MessageData) -> Option<Self> {
+        self.apply_template(data).ok().inspect(|_| debug!("Applying template to process"))
+    }
+
     fn call(bind: plugin::Bind<Self>) -> CallResult {
         if bind.receiver()?.output.is_some() {
             debug!("Process output has not been handled");
@@ -51,10 +60,15 @@ impl Plugin for Process {
                 command.args(args);
             }
 
+            for [k, v] in p.env.iter() {
+                debug!("Setting env variable {k}");
+                command.env(k, v);
+            }
+
             let output = with_cancel(ct)
                 .run(command.output())
                 .await??;
-            // eprintln!("Calling command {output:?}");
+
             let status = output.status;
             binding.update()?.output = Some(output);
             if status.success() {

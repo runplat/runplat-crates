@@ -47,7 +47,10 @@ pub enum Error {
     /// Error when a join handle can not run to completion, analagous to tokio::runtime::JoinError
     IOError { message: String },
     /// Error when a serialization error occurs
-    SerializationError { message: String, format: SerializationFormat },
+    SerializationError {
+        message: String,
+        format: SerializationFormat,
+    },
     /// Error returned when a plugin could not be loaded from a path
     LoadPluginError,
     /// Error returned when a `Name` could not be parsed
@@ -82,7 +85,7 @@ pub enum Error {
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum SerializationFormat {
     Toml,
-    Json
+    Json,
 }
 
 impl From<tokio::task::JoinError> for Error {
@@ -104,19 +107,28 @@ impl From<std::io::Error> for Error {
 
 impl From<toml::ser::Error> for Error {
     fn from(value: toml::ser::Error) -> Self {
-        Error::SerializationError { message: value.to_string(), format: SerializationFormat::Toml }
+        Error::SerializationError {
+            message: value.to_string(),
+            format: SerializationFormat::Toml,
+        }
     }
 }
 
 impl From<toml::de::Error> for Error {
     fn from(value: toml::de::Error) -> Self {
-        Error::SerializationError { message: value.to_string(), format: SerializationFormat::Toml }
+        Error::SerializationError {
+            message: value.to_string(),
+            format: SerializationFormat::Toml,
+        }
     }
 }
 
 impl From<serde_json::Error> for Error {
     fn from(value: serde_json::Error) -> Self {
-        Error::SerializationError { message: value.to_string(), format: SerializationFormat::Json }
+        Error::SerializationError {
+            message: value.to_string(),
+            format: SerializationFormat::Json,
+        }
     }
 }
 
@@ -271,7 +283,7 @@ pub(crate) mod tests {
             fork_fn: TestPlugin::fork,
             cancel: CancellationToken::new(),
             runtime: tokio::runtime::Handle::current(),
-            handler: None
+            handler: None,
         };
 
         assert_eq!(
@@ -287,7 +299,7 @@ pub(crate) mod tests {
             fork_fn: TestPlugin::fork,
             cancel: CancellationToken::new(),
             runtime: tokio::runtime::Handle::current(),
-            handler: None
+            handler: None,
         };
         let mut bound = call.bind::<TestPlugin>().expect("should bind");
         bound.receiver().expect("should return a plugin");
@@ -300,7 +312,7 @@ pub(crate) mod tests {
             fork_fn: TestPlugin::fork,
             cancel: CancellationToken::new(),
             runtime: tokio::runtime::Handle::current(),
-            handler: None
+            handler: None,
         };
         let mut bind = Bind::<NotTestPlugin> {
             call,
